@@ -1,6 +1,102 @@
-# Svelte + Vite
+# Women's Football Data Visualizations
 
-This template should help get you started developing with Svelte in Vite.
+A minimalistic website for interactive data visualizations of women's football players using D3.js and Svelte.
+
+## Features
+
+- **Player Network Visualization**: Interactive radial visualization showing connections between players who played on the same teams
+- **Player Success & Popularity**: Visual representation of trophies, country distribution, and social media popularity
+- **Dark/Light Theme**: System theme detection with manual toggle
+- **Responsive Design**: Mobile-first approach with expandable sidebar menu
+- **Data-driven**: CSV-based data input with support for multiple data sources
+
+## Tech Stack
+
+- **D3.js**: Data manipulation and SVG-based rendering
+- **Svelte**: Reactive UI components
+- **Vite**: Build tool and development server
+- **Font Awesome**: Free icon set (CC BY 4.0)
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or higher)
+- npm
+
+### Installation
+
+```bash
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` to view the app.
+
+### Build
+
+```bash
+npm run build
+```
+
+The built files will be in the `dist` directory.
+
+### Preview Production Build
+
+```bash
+npm run preview
+```
+
+## Data Files
+
+- `public/data/players.csv`: Player network data (clubs, goals, national teams)
+- `public/data/player-success.csv`: Player success data (trophies, followers, mentions)
+
+## Deployment
+
+This project can be deployed to several platforms:
+
+### Vercel (Recommended)
+
+1. Push your code to GitHub
+2. Import your repository at [vercel.com](https://vercel.com)
+3. Vercel will automatically detect the Vite configuration
+4. Deploy with one click
+
+The `vercel.json` file is already configured.
+
+### Netlify
+
+1. Push your code to GitHub
+2. Import your repository at [netlify.com](https://netlify.com)
+3. Netlify will use the `netlify.toml` configuration
+4. Deploy with one click
+
+### GitHub Pages
+
+1. Go to your repository Settings → Pages
+2. Select "GitHub Actions" as the source
+3. The workflow (`.github/workflows/deploy.yml`) will automatically build and deploy on pushes to `main`
+
+Note: Update the `base` path in `vite.config.js` if your repository name is different from `sport-viz-experiment`.
+
+## Project Structure
+
+```
+├── public/
+│   └── data/          # CSV data files
+├── src/
+│   ├── components/    # Reusable Svelte components
+│   ├── stores/         # Svelte stores (theme, etc.)
+│   ├── utils/          # Helper functions
+│   └── visualizations/ # D3.js visualization components
+└── dist/              # Production build output
+```
 
 ## Recommended IDE Setup
 
