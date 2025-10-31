@@ -306,12 +306,157 @@
     
     console.log('Color scale created', { validCountries, colorScale: typeof colorScale });
 
+    // Sort players: first by country (alphabetically), then alphabetically by name within each country
+    data.sort((a, b) => {
+      const countryA = (a.country_provenance || a.national_team || '').toLowerCase();
+      const countryB = (b.country_provenance || b.national_team || '').toLowerCase();
+      
+      // First sort by country alphabetically (case-insensitive)
+      if (countryA !== countryB) {
+        return countryA.localeCompare(countryB);
+      }
+      
+      // Then sort alphabetically by name within the same country (case-insensitive)
+      return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase());
+    });
+
     // Create angles for each player - evenly distribute around circle
     const numPlayers = data.length;
     const angleStep = (2 * Math.PI) / numPlayers;
 
-    // Draw connections (hidden by default, shown on hover)
+    // Draw radial lines to slice the circles (pie-like dividers for each player)
+    const radialLinesLayer = g.append('g').attr('class', 'radial-lines-layer');
+    
+    // Draw a line for each player slice boundary
+    for (let i = 0; i < numPlayers; i++) {
+      const angle = i * angleStep;
+      const startRadius = innerRadius * 0.5; // Start slightly inside inner radius
+      const endRadius = playerNameRadius + 10; // Extend slightly beyond player names
+      
+      const x1 = Math.cos(angle - Math.PI / 2) * startRadius;
+      const y1 = Math.sin(angle - Math.PI / 2) * startRadius;
+      const x2 = Math.cos(angle - Math.PI / 2) * endRadius;
+      const y2 = Math.sin(angle - Math.PI / 2) * endRadius;
+      
+      radialLinesLayer.append('line')
+        .attr('x1', x1)
+        .attr('y1', y1)
+        .attr('x2', x2)
+        .attr('y2', y2)
+        .style('stroke', 'var(--text-color)')
+        .style('stroke-width', 1)
+        .style('stroke-dasharray', '2,4')
+        .style('opacity', 0.15);
+    }
+
+    // Draw circle outlines for each ring section
+    const circlesLayer = g.append('g').attr('class', 'circles-layer');
+    
+    // Inner circle (connection points)
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', innerRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--text-color)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Goals circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', goalsRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--text-color)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Clubs circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', clubsRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--text-color)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // National team/countries circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', nationalTeamRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--text-color)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Player names circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', playerNameRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--text-color)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Draw connections layer (all connections visible by default, highlighted on hover)
     const connectionsLayer = g.append('g').attr('class', 'connections-layer');
+    
+    // Store all connection paths for highlighting
+    const allConnections = [];
+    
+    // Draw all connections initially as light lines
+    data.forEach((player, i) => {
+      const connections = findConnections(player, data);
+      connections.forEach(conn => {
+        const otherIndex = data.findIndex(p => p.name === conn.player.name);
+        if (otherIndex !== -1 && otherIndex > i) { // Only draw each connection once
+          const angle1 = i * angleStep;
+          const angle2 = otherIndex * angleStep;
+          
+          const x1 = Math.cos(angle1 - Math.PI / 2) * innerRadius;
+          const y1 = Math.sin(angle1 - Math.PI / 2) * innerRadius;
+          const x2 = Math.cos(angle2 - Math.PI / 2) * innerRadius;
+          const y2 = Math.sin(angle2 - Math.PI / 2) * innerRadius;
+          
+          const midAngle = (angle1 + angle2) / 2;
+          const midRadius = innerRadius * 0.5;
+          const midX = Math.cos(midAngle - Math.PI / 2) * midRadius;
+          const midY = Math.sin(midAngle - Math.PI / 2) * midRadius;
+          
+          const path = d3.path();
+          path.moveTo(x1, y1);
+          path.quadraticCurveTo(midX, midY, x2, y2);
+          
+          const connectionPath = connectionsLayer.append('path')
+            .attr('d', path.toString())
+            .style('stroke', 'var(--text-color)')
+            .style('stroke-width', 1)
+            .style('opacity', 0.15)
+            .style('fill', 'none')
+            .attr('class', 'connection-line')
+            .attr('data-player1', player.name)
+            .attr('data-player2', conn.player.name)
+            .style('pointer-events', 'none');
+          
+          allConnections.push({
+            path: connectionPath,
+            player1: player.name,
+            player2: conn.player.name,
+            player1Index: i,
+            player2Index: otherIndex
+          });
+        }
+      });
+    });
     
     // Draw player names (outermost)
     const namesLayer = g.append('g').attr('class', 'names-layer');
@@ -421,6 +566,7 @@
         .attr('dominant-baseline', 'middle')
         .attr('class', 'player-name')
         .style('font-size', '14px')
+        .style('font-family', 'monospace')
         .style('fill', playerColor)
         .style('font-weight', '500')
         .text(player.name);
@@ -478,6 +624,7 @@
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
         .style('font-size', '11px')
+        .style('font-family', 'monospace')
         .style('font-weight', 'bold')
         .style('fill', 'var(--text-color)')
         .text(player.career_goals);
@@ -554,6 +701,7 @@
         .attr('dominant-baseline', 'middle')
         .attr('transform', `rotate(${radialRotation}, ${natTeamX}, ${natTeamY})`)
         .style('font-size', '12px')
+        .style('font-family', 'monospace')
         .style('fill', playerColor)
         .style('opacity', 0.8)
         .style('font-weight', '600')
@@ -562,8 +710,7 @@
 
     function showConnections(player, playerIndex) {
       const connections = findConnections(player, data);
-      
-      console.log('Showing connections for', player.name, 'found', connections.length, 'connections', connections);
+      const playerColor = colorScale(player.country_provenance || player.national_team || 'Unknown');
       
       // Highlight connected player names
       connections.forEach(conn => {
@@ -576,7 +723,7 @@
               .style('font-weight', 'bold')
               .style('font-size', '16px')
               .style('opacity', 1)
-              .style('fill', d3.rgb(connPlayerColor).darker(0.2).toString()); // Slightly darken for contrast
+              .style('fill', d3.rgb(connPlayerColor).darker(0.2).toString());
           }
           // Show underline for connected players
           const connectedUnderline = connectedNameGroup.select('line');
@@ -586,58 +733,25 @@
         }
       });
       
-      connections.forEach(conn => {
-        const currentPlayerIndex = playerIndex !== undefined ? playerIndex : data.findIndex(p => p.name === player.name);
-        const otherIndex = data.findIndex(p => p.name === conn.player.name);
-        
-        console.log('Drawing connection:', player.name, 'to', conn.player.name, 'indices:', currentPlayerIndex, otherIndex);
-        
-        if (currentPlayerIndex !== -1 && otherIndex !== -1) {
-          const angle1 = currentPlayerIndex * angleStep;
-          const angle2 = otherIndex * angleStep;
-          
-          // Connection lines start from innerRadius (connection points)
-          const x1 = Math.cos(angle1 - Math.PI / 2) * innerRadius;
-          const y1 = Math.sin(angle1 - Math.PI / 2) * innerRadius;
-          const x2 = Math.cos(angle2 - Math.PI / 2) * innerRadius;
-          const y2 = Math.sin(angle2 - Math.PI / 2) * innerRadius;
-          
-          // Use arc path for curved connections
-          const midAngle = (angle1 + angle2) / 2;
-          const midRadius = innerRadius * 0.5; // Curve depth
-          const midX = Math.cos(midAngle - Math.PI / 2) * midRadius;
-          const midY = Math.sin(midAngle - Math.PI / 2) * midRadius;
-          
-          const path = d3.path();
-          path.moveTo(x1, y1);
-          path.quadraticCurveTo(midX, midY, x2, y2);
-          
-          // Get color from one of the connected players
-          const connectionCountry = player.country_provenance || player.national_team || 'Unknown';
-          const connectionColor = colorScale(connectionCountry);
-          
-          const connectionPath = connectionsLayer.append('path')
-            .attr('d', path.toString())
-            .style('stroke', connectionColor)
+      // Highlight connections for this player (make them thicker and colored)
+      allConnections.forEach(conn => {
+        if (conn.player1 === player.name || conn.player2 === player.name) {
+          conn.path
+            .style('stroke', playerColor)
             .style('stroke-width', 3)
-            .style('opacity', 0.7)
-            .style('fill', 'none')
-            .attr('class', 'connection-line')
-            .style('pointer-events', 'none');
-          
-          console.log('Connection path created:', {
-            path: path.toString(),
-            color: connectionColor,
-            x1, y1, x2, y2
-          });
-        } else {
-          console.warn('Invalid indices for connection:', currentPlayerIndex, otherIndex);
+            .style('opacity', 0.7);
         }
       });
     }
 
     function hideConnections() {
-      connectionsLayer.selectAll('.connection-line').remove();
+      // Reset all connections back to light gray
+      allConnections.forEach(conn => {
+        conn.path
+          .style('stroke', 'var(--text-color)')
+          .style('stroke-width', 1)
+          .style('opacity', 0.15);
+      });
       
       // Remove highlighting from all player names
       namesLayer.selectAll('.player-name-group').each(function() {
@@ -653,7 +767,7 @@
             .style('font-weight', '500')
             .style('font-size', '14px')
             .style('opacity', 1)
-            .style('fill', playerColor); // Restore original color
+            .style('fill', playerColor);
         }
         
         // Hide underline if not the currently hovered player
@@ -676,6 +790,7 @@
       .attr('y', 0)
       .attr('dy', '0.35em')
       .style('font-size', '12px')
+      .style('font-family', 'monospace')
       .style('font-weight', 'bold')
       .style('fill', 'var(--text-color)')
       .text('Countries');
@@ -695,8 +810,9 @@
       .attr('x', 12)
       .attr('dy', '0.35em')
       .style('font-size', '10px')
+      .style('font-family', 'monospace')
       .style('fill', 'var(--text-color)')
-      .text(d => d);
+      .text(d => getCountryCode(d));
   }
 </script>
 
