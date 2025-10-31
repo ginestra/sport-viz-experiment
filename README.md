@@ -59,31 +59,16 @@ npm run preview
 
 ## Deployment
 
-This project can be deployed to several platforms:
+This project is configured for deployment on Vercel.
 
-### Vercel (Recommended)
+### Vercel
 
 1. Push your code to GitHub
 2. Import your repository at [vercel.com](https://vercel.com)
-3. Vercel will automatically detect the Vite configuration
+3. Vercel will automatically detect the Vite configuration from `vercel.json`
 4. Deploy with one click
 
-The `vercel.json` file is already configured.
-
-### Netlify
-
-1. Push your code to GitHub
-2. Import your repository at [netlify.com](https://netlify.com)
-3. Netlify will use the `netlify.toml` configuration
-4. Deploy with one click
-
-### GitHub Pages
-
-1. Go to your repository Settings → Pages
-2. Select "GitHub Actions" as the source
-3. The workflow (`.github/workflows/deploy.yml`) will automatically build and deploy on pushes to `main`
-
-Note: Update the `base` path in `vite.config.js` if your repository name is different from `sport-viz-experiment`.
+Future pushes to the `main` branch will automatically trigger deployments.
 
 ## Project Structure
 
