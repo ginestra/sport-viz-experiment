@@ -306,13 +306,15 @@
     // NEW ORDER: Define radii for different rings (from inner to outer: network, player names, country, clubs, appearances, assists, goals)
     const radiusMultiplier = isMobile ? 0.9 : 1.0; // Slightly smaller on mobile
     const innerRadius = size * 0.08 * radiusMultiplier;  // Connection points (network - stays same)
-    const nameMargin = 2.5; // Margin between player names and connection circles (in pixels)
-    const playerNameRadius = size * 0.12 * radiusMultiplier + nameMargin;  // Player names (second layer) - closer to network circle with margin
-    const nationalTeamRadius = size * 0.32 * radiusMultiplier;  // National team names (third layer) - increased for more distance from player names
-    const clubsRadius = size * 0.39 * radiusMultiplier;  // Club dots (fourth layer) - adjusted to maintain spacing
+    const connectionPointRadius = 3; // Radius of connection point circles
+    const nameMarginFromCircle = 4; // Distance from circle edge to where text starts (in pixels)
+    // Position text 4px away from the outer edge of connection circles
+    const playerNameRadius = innerRadius + connectionPointRadius + nameMarginFromCircle;  // Player names (second layer)
+    const nationalTeamRadius = size * 0.26 * radiusMultiplier;  // National team names (third layer) - reduced to give more space for hovered player names
+    const clubsRadius = size * 0.35 * radiusMultiplier;  // Club dots (fourth layer) - reduced to prevent overlap with appearances
     const appearancesRadius = size * 0.425 * radiusMultiplier;  // Appearances count (fifth layer) - between clubs and assists
-    const assistsRadius = size * 0.46 * radiusMultiplier;  // Assists count (sixth layer) - adjusted to maintain spacing
     const goalsRadius = size * 0.53 * radiusMultiplier;  // Goals count (outermost layer) - adjusted to maintain spacing
+    const assistsRadius = (appearancesRadius + goalsRadius) / 2;  // Assists count (sixth layer) - exactly between appearances and goals
 
     // Create color scale by country - filter out undefined/null values
     let countryValues = [];
@@ -594,6 +596,32 @@
       .style('fill', 'var(--viz-icon-color)')
       .style('opacity', 0.2);
 
+    // Calculate min/max values for proper scaling of circles
+    const appearancesValues = data.map(p => getFilteredAppearances(p)).filter(v => v > 0);
+    const assistsValues = data.map(p => getFilteredAssists(p)).filter(v => v > 0);
+    const goalsValues = data.map(p => getFilteredGoals(p)).filter(v => v > 0);
+    
+    const minAppearances = appearancesValues.length > 0 ? Math.min(...appearancesValues) : 0;
+    const maxAppearances = appearancesValues.length > 0 ? Math.max(...appearancesValues) : 1;
+    const minAssists = assistsValues.length > 0 ? Math.min(...assistsValues) : 0;
+    const maxAssists = assistsValues.length > 0 ? Math.max(...assistsValues) : 1;
+    const minGoals = goalsValues.length > 0 ? Math.min(...goalsValues) : 0;
+    const maxGoals = goalsValues.length > 0 ? Math.max(...goalsValues) : 1;
+    
+    // Create scale functions (using square root for area proportionality)
+    // Radius range: min 6px to max 20px for appearances, min 6px to max 18px for assists, min 8px to max 22px for goals
+    const appearancesScale = d3.scaleSqrt()
+      .domain([minAppearances, maxAppearances])
+      .range([6, 20]);
+    
+    const assistsScale = d3.scaleSqrt()
+      .domain([minAssists, maxAssists])
+      .range([6, 18]);
+    
+    const goalsScale = d3.scaleSqrt()
+      .domain([minGoals, maxGoals])
+      .range([8, 22]);
+
     data.forEach((player, i) => {
       // Start from index 1 because index 0 is reserved for legends
       const angle = (i + 1) * angleStep;
@@ -641,7 +669,7 @@
         .style('cursor', 'pointer');
       
       const displayName = isMobile ? getLastName(player.name) : player.name;
-      const fontSize = isMobile ? '11px' : '14px';
+      const fontSize = '10px'; // Initial state: same size for mobile and desktop
       
       // Choose anchor based on side: right side uses 'start', left side uses 'end'
       const textAnchor = isRightSide ? 'start' : 'end';
@@ -729,7 +757,7 @@
           nameText.attr('data-is-hovered', 'true');
           
           // Set hovered player's font size (slightly bigger for better visibility)
-          const hoverFontSize = isMobile ? '14px' : '18px';
+          const hoverFontSize = '12px'; // Hover/selected: same size for mobile and desktop
           nameText
             .style('font-weight', 'bold')
             .style('font-size', hoverFontSize)
@@ -751,13 +779,19 @@
           nameText.attr('data-is-hovered', null);
           
           hideConnections();
-          const normalFontSize = isMobile ? '11px' : '14px';
+          
+          // If player is selected, keep hover size; otherwise restore to initial size
+          const shouldKeepHoverSize = selectedPlayer && selectedPlayer.name === player.name;
+          const normalFontSize = shouldKeepHoverSize 
+            ? '12px'  // Keep hover size if selected
+            : '10px';   // Restore initial size if not selected
+          
           nameText
-            .style('font-weight', '500')
+            .style('font-weight', shouldKeepHoverSize ? 'bold' : '500')
             .style('font-size', normalFontSize)
             .attr('font-size', normalFontSize)
             .style('fill', playerColor);
-          underline.style('opacity', 0);
+          underline.style('opacity', shouldKeepHoverSize ? 1 : 0);
           
           // Unhighlight this player's data elements (but keep selection if selected)
           if (!selectedPlayer || selectedPlayer.name !== player.name) {
@@ -869,7 +903,7 @@
       const appearancesCircle = appearancesLayer.append('circle')
         .attr('cx', appearancesX)
         .attr('cy', appearancesY)
-        .attr('r', Math.max(6, Math.min(18, filteredAppearances / 15)))
+        .attr('r', filteredAppearances > 0 ? appearancesScale(filteredAppearances) : 6)
         .attr('data-player-index', i)
         .attr('class', 'appearances-circle')
         .style('fill', playerColor)
@@ -897,7 +931,7 @@
       const assistsCircle = assistsLayer.append('circle')
         .attr('cx', assistsX)
         .attr('cy', assistsY)
-        .attr('r', Math.max(6, Math.min(16, filteredAssists / 8)))
+        .attr('r', filteredAssists > 0 ? assistsScale(filteredAssists) : 6)
         .attr('data-player-index', i)
         .attr('class', 'assists-circle')
         .style('fill', playerColor)
@@ -925,7 +959,7 @@
       const goalsCircle = goalsLayer.append('circle')
         .attr('cx', goalsX)
         .attr('cy', goalsY)
-        .attr('r', Math.max(8, Math.min(20, filteredGoals / 10)))
+        .attr('r', filteredGoals > 0 ? goalsScale(filteredGoals) : 8)
         .attr('data-player-index', i)
         .attr('class', 'goals-circle')
         .style('fill', playerColor)
@@ -1055,8 +1089,8 @@
         if (!connectedNameGroup.empty()) {
           const connectedNameText = connectedNameGroup.select('.player-name');
           if (!connectedNameText.empty()) {
-            // Slightly bigger font for connected players (but smaller than hovered)
-            const connectedFontSize = isMobile ? '12px' : '15px';
+            // Connected players font size (slightly bigger than initial, but smaller than hovered)
+            const connectedFontSize = '11px'; // Connected: same size for mobile and desktop
             connectedNameText
               .style('font-weight', 'bold')
               .style('font-size', connectedFontSize)
@@ -1108,7 +1142,7 @@
           if (!nameGroup.empty()) {
             const nameText = nameGroup.select('.player-name');
             if (!nameText.empty()) {
-              const normalFontSize = isMobile ? '11px' : '14px';
+              const normalFontSize = '10px'; // Initial state
               nameText
                 .style('font-weight', '500')
                 .style('font-size', normalFontSize)
@@ -1153,8 +1187,15 @@
           if (!nameGroup.empty()) {
             const nameText = nameGroup.select('.player-name');
             if (!nameText.empty()) {
-              const fontSize = isMobile ? '11px' : '14px';
+              // Selected player gets hover size, connected players get medium size
+              const isSelected = player.name === selectedPlayer.name;
+              const fontSize = isSelected 
+                ? '12px'  // Selected player: hover size
+                : '11px';  // Connected players: medium size
               nameText
+                .style('font-size', fontSize)
+                .attr('font-size', fontSize)
+                .style('font-weight', isSelected ? 'bold' : 'bold')
                 .style('fill', playerColor)
                 .style('opacity', 1);
             }
@@ -1277,7 +1318,7 @@
         if (playerData) {
           const playerCountry = playerData.country_provenance || playerData.national_team || 'Unknown';
           const playerColor = colorScale(playerCountry);
-          const resetFontSize = isMobile ? '11px' : '14px';
+          const resetFontSize = '10px'; // Initial state
           
           const nameTextEl = group.select('.player-name');
           nameTextEl
