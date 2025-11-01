@@ -20,6 +20,11 @@
   --primary-color: #646cff;
   --tooltip-bg: rgba(0, 0, 0, 0.9);
   --tooltip-text: #ffffff;
+  /* Visualization colors for light mode - ensure good contrast */
+  --viz-icon-color: #213547;
+  --viz-stroke-color: #213547;
+  --viz-circle-stroke: #213547;
+  --viz-connection-color: #666666;
 }
 
 /* Dark theme variables */
@@ -33,6 +38,11 @@
   --primary-color: #646cff;
   --tooltip-bg: rgba(255, 255, 255, 0.95);
   --tooltip-text: #000000;
+  /* Visualization colors for dark mode - ensure good contrast */
+  --viz-icon-color: rgba(255, 255, 255, 0.87);
+  --viz-stroke-color: rgba(255, 255, 255, 0.87);
+  --viz-circle-stroke: rgba(255, 255, 255, 0.9);
+  --viz-connection-color: rgba(255, 255, 255, 0.4);
 }
 
 * {

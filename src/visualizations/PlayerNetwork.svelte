@@ -364,7 +364,7 @@
         .attr('y1', y1)
         .attr('x2', x2)
         .attr('y2', y2)
-        .style('stroke', 'var(--text-color)')
+        .style('stroke', 'var(--viz-stroke-color)')
         .style('stroke-width', 1)
         .style('stroke-dasharray', '2,4')
         .style('opacity', 0.15);
@@ -379,7 +379,7 @@
       .attr('cy', 0)
       .attr('r', innerRadius)
       .style('fill', 'none')
-      .style('stroke', 'var(--text-color)')
+      .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
@@ -390,7 +390,7 @@
       .attr('cy', 0)
       .attr('r', goalsRadius)
       .style('fill', 'none')
-      .style('stroke', 'var(--text-color)')
+      .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
@@ -401,7 +401,7 @@
       .attr('cy', 0)
       .attr('r', assistsRadius)
       .style('fill', 'none')
-      .style('stroke', 'var(--text-color)')
+      .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
@@ -412,7 +412,7 @@
       .attr('cy', 0)
       .attr('r', clubsRadius)
       .style('fill', 'none')
-      .style('stroke', 'var(--text-color)')
+      .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
@@ -423,7 +423,7 @@
       .attr('cy', 0)
       .attr('r', nationalTeamRadius)
       .style('fill', 'none')
-      .style('stroke', 'var(--text-color)')
+      .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
@@ -434,7 +434,7 @@
       .attr('cy', 0)
       .attr('r', playerNameRadius)
       .style('fill', 'none')
-      .style('stroke', 'var(--text-color)')
+      .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
@@ -468,16 +468,16 @@
           path.moveTo(x1, y1);
           path.quadraticCurveTo(midX, midY, x2, y2);
           
-          const connectionPath = connectionsLayer.append('path')
-            .attr('d', path.toString())
-            .style('stroke', 'var(--text-color)')
-            .style('stroke-width', 1)
-            .style('opacity', 0.15)
-            .style('fill', 'none')
-            .attr('class', 'connection-line')
-            .attr('data-player1', player.name)
-            .attr('data-player2', conn.player.name)
-            .style('pointer-events', 'none');
+              const connectionPath = connectionsLayer.append('path')
+                .attr('d', path.toString())
+                .style('stroke', 'var(--viz-connection-color)')
+                .style('stroke-width', 1)
+                .style('opacity', 0.15)
+                .style('fill', 'none')
+                .attr('class', 'connection-line')
+                .attr('data-player1', player.name)
+                .attr('data-player2', conn.player.name)
+                .style('pointer-events', 'none');
           
           allConnections.push({
             path: connectionPath,
@@ -516,14 +516,8 @@
     const soccerBallPath = iconGroup.append('path')
       .attr('d', 'M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6l59.2 0c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z')
       .attr('transform', `scale(${iconSize / 512}) translate(-256, -256)`)
-      .style('fill', 'currentColor')
+      .style('fill', 'var(--viz-icon-color)')
       .style('opacity', 0.2);
-    
-    // Set color using CSS variable - get computed value that updates with theme
-    if (typeof window !== 'undefined' && document.documentElement) {
-      const computedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim();
-      soccerBallPath.style('fill', computedColor || '#333');
-    }
 
     data.forEach((player, i) => {
       // Start from index 1 because index 0 is reserved for legends
@@ -822,10 +816,10 @@
     }
 
     function hideConnections() {
-      // Reset all connections back to light gray
+      // Reset all connections back to light color
       allConnections.forEach(conn => {
         conn.path
-          .style('stroke', 'var(--text-color)')
+          .style('stroke', 'var(--viz-connection-color)')
           .style('stroke-width', 1)
           .style('opacity', 0.15);
       });
@@ -895,11 +889,8 @@
       // Icon size (smaller on mobile)
       const iconSize = isMobile ? 10 : 14;
       
-      // Get computed text color for icon
-      let iconColor = '#333';
-      if (typeof window !== 'undefined' && document.documentElement) {
-        iconColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#333';
-      }
+      // Use visualization-specific icon color that adapts to theme
+      // CSS variables are automatically updated when theme changes
       
       // Add icon centered on circle (like goals circle)
       const iconGroup = legendsLayer.append('g')
@@ -918,7 +909,7 @@
       const iconPath = iconGroup.append('path')
         .attr('d', config.path)
         .attr('transform', `scale(${scale}) translate(${-viewBoxCenterX}, ${-viewBoxCenterY})`)
-        .style('fill', iconColor)
+        .style('fill', 'var(--viz-icon-color)')
         .style('opacity', 0.8)
         .style('cursor', 'pointer');
       
