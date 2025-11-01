@@ -1683,7 +1683,8 @@
     opacity: 0;
     overflow: hidden;
     background: var(--bg-primary);
-    border: 1px solid var(--viz-stroke-color);
+    border: 1px dashed;
+    border-color: color-mix(in srgb, var(--viz-stroke-color) 30%, transparent);
     border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
