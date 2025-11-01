@@ -10,8 +10,15 @@
   let visualizationCreated = false;
   let resizeObserver;
   let hoveredPlayer = null;
+  let selectedPlayer = null; // Selected player for filtering/highlighting
   let svg, g;
   let isMobile = false;
+  let applySelectionStateFn = null; // Reference to selection function
+  let careerTypeFilter = 'cumulative'; // 'cumulative', 'club', 'international'
+  let selectedYear = null; // null = show all aggregated
+  let dataLastUpdated = null; // Last update date for data
+  let dataSource = 'Various online sources'; // Data source attribution - update with actual source
+  let playerInfoCard = null; // Selected player for info card
 
   // Helper function to get last name from full name
   function getLastName(fullName) {
@@ -63,10 +70,37 @@
         ...d,
         career_goals: +d.career_goals || 0,
         career_assists: +d.career_assists || 0,
+        club_goals: +d.club_goals || 0,
+        club_assists: +d.club_assists || 0,
+        international_goals: +d.international_goals || 0,
+        international_assists: +d.international_assists || 0,
         clubs: clubs,
         national_team: d.national_team || d.country_provenance
       };
     });
+  }
+  
+  // Helper function to get goals/assists based on career type filter
+  function getFilteredGoals(player) {
+    switch (careerTypeFilter) {
+      case 'club':
+        return player.club_goals || 0;
+      case 'international':
+        return player.international_goals || 0;
+      default:
+        return player.career_goals || 0;
+    }
+  }
+  
+  function getFilteredAssists(player) {
+    switch (careerTypeFilter) {
+      case 'club':
+        return player.club_assists || 0;
+      case 'international':
+        return player.international_assists || 0;
+      default:
+        return player.career_assists || 0;
+    }
   }
 
   function findConnections(player, allPlayers) {
@@ -83,7 +117,14 @@
         otherClubs.forEach(oClub => {
           if (pClub.name === oClub.name && pClub.startYear && oClub.startYear && pClub.endYear && oClub.endYear) {
             // Check if they overlapped in time
-            const overlap = !(pClub.endYear < oClub.startYear || oClub.endYear < pClub.startYear);
+            let overlap = !(pClub.endYear < oClub.startYear || oClub.endYear < pClub.startYear);
+            
+            // If year filter is active, also check if overlap includes that year
+            if (selectedYear !== null && overlap) {
+              overlap = selectedYear >= Math.max(pClub.startYear, oClub.startYear) && 
+                        selectedYear <= Math.min(pClub.endYear, oClub.endYear);
+            }
+            
             if (overlap) {
               commonTeams.push(pClub.name);
             }
@@ -91,7 +132,7 @@
         });
       });
       
-      // Also check national team connection
+      // Also check national team connection (always show, regardless of year filter for simplicity)
       if (player.national_team === otherPlayer.national_team) {
         commonTeams.push(player.national_team);
       }
@@ -147,6 +188,11 @@
       }
 
       data = parsedData;
+      
+      // Try to get last updated date from CSV metadata or set to today
+      // Check if there's a metadata row or use file modification time
+      dataLastUpdated = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      
       loading = false;
     } catch (err) {
       console.error('Error loading visualization:', err);
@@ -168,6 +214,35 @@
     visualizationCreated = true;
     createVisualization();
     setupResizeObserver();
+    // Apply selection state if a player is selected
+    if (selectedPlayer && applySelectionStateFn) {
+      setTimeout(() => applySelectionStateFn(), 0);
+    }
+  }
+  
+  // React to selection changes
+  $: if (applySelectionStateFn && visualizationCreated) {
+    applySelectionStateFn();
+  }
+  
+  // Track previous filter values to detect changes
+  let prevCareerTypeFilter = 'cumulative';
+  let prevSelectedYear = null;
+  
+  // React to filter changes - recreate visualization
+  $: if (visualizationCreated && container && data.length > 0 && 
+         (careerTypeFilter !== prevCareerTypeFilter || selectedYear !== prevSelectedYear)) {
+    prevCareerTypeFilter = careerTypeFilter;
+    prevSelectedYear = selectedYear;
+    visualizationCreated = false;
+    setTimeout(() => {
+      visualizationCreated = true;
+      createVisualization();
+      setupResizeObserver();
+      if (selectedPlayer && applySelectionStateFn) {
+        setTimeout(() => applySelectionStateFn(), 0);
+      }
+    }, 0);
   }
 
   function createVisualization() {
@@ -195,7 +270,15 @@
       .attr('height', height)
       .attr('viewBox', `0 0 ${width} ${height}`)
       .style('max-width', '100%')
-      .style('height', 'auto');
+      .style('height', 'auto')
+      .on('click', function(event) {
+        // Deselect if clicking on empty space (not on a player name)
+        if (event.target === this || event.target.tagName === 'svg') {
+          selectedPlayer = null;
+          playerInfoCard = null;
+          // Selection state will be applied via reactive statement
+        }
+      });
 
     g = svg.append('g')
       .attr('transform', `translate(${centerX}, ${centerY})`);
@@ -205,7 +288,8 @@
     // NEW ORDER: Define radii for different rings (from inner to outer: network, player names, country, clubs, assists, goals)
     const radiusMultiplier = isMobile ? 0.9 : 1.0; // Slightly smaller on mobile
     const innerRadius = size * 0.08 * radiusMultiplier;  // Connection points (network - stays same)
-    const playerNameRadius = size * 0.12 * radiusMultiplier;  // Player names (second layer) - closer to network circle
+    const nameMargin = 2.5; // Margin between player names and connection circles (in pixels)
+    const playerNameRadius = size * 0.12 * radiusMultiplier + nameMargin;  // Player names (second layer) - closer to network circle with margin
     const nationalTeamRadius = size * 0.32 * radiusMultiplier;  // National team names (third layer) - increased for more distance from player names
     const clubsRadius = size * 0.39 * radiusMultiplier;  // Club dots (fourth layer) - adjusted to maintain spacing
     const assistsRadius = size * 0.46 * radiusMultiplier;  // Assists count (fifth layer) - adjusted to maintain spacing
@@ -511,6 +595,8 @@
         .attr('cx', connectionX)
         .attr('cy', connectionY)
         .attr('r', 3)
+        .attr('data-player-index', i)
+        .attr('class', 'connection-point')
         .style('fill', playerColor)
         .style('opacity', 0.6);
 
@@ -625,19 +711,6 @@
           
           // Highlight ONLY this player's data elements (not connected players')
           highlightPlayerData(i, playerColor);
-          
-          tooltip.transition()
-            .duration(200)
-            .style('opacity', 1);
-          tooltip.html(`
-              <strong>${player.name}</strong><br/>
-              National Team: ${player.national_team}<br/>
-              Career Goals: ${player.career_goals}<br/>
-              Career Assists: ${player.career_assists || 0}<br/>
-              Clubs: ${player.clubs.map(c => c.name).join(', ')}
-          `)
-            .style('left', (event.pageX + 10) + 'px')
-            .style('top', (event.pageY - 10) + 'px');
         })
         .on('mouseleave', function() {
           hoveredPlayer = null;
@@ -655,11 +728,23 @@
             .style('fill', playerColor);
           underline.style('opacity', 0);
           
-          // Unhighlight this player's data elements
-          unhighlightPlayerData(i);
-          tooltip.transition()
-            .duration(200)
-            .style('opacity', 0);
+          // Unhighlight this player's data elements (but keep selection if selected)
+          if (!selectedPlayer || selectedPlayer.name !== player.name) {
+            unhighlightPlayerData(i);
+          }
+        })
+        .on('click', function(event) {
+          event.stopPropagation();
+          
+          // Toggle selection: if clicking the same player, deselect; otherwise select new player
+          if (selectedPlayer && selectedPlayer.name === player.name) {
+            selectedPlayer = null;
+            playerInfoCard = null;
+          } else {
+            selectedPlayer = player;
+            playerInfoCard = player; // Set player info for card display
+          }
+          // Selection state will be applied via reactive statement
         });
 
       // National team code (third layer)
@@ -683,13 +768,17 @@
         .style('font-weight', '600')
         .text(countryCode);
 
-      // Club dots (fourth layer)
-      const numClubs = player.clubs.length;
+      // Club dots (fourth layer) - filter by year if selected
+      const filteredClubs = selectedYear !== null 
+        ? player.clubs.filter(club => club.startYear && club.endYear && 
+            selectedYear >= club.startYear && selectedYear <= club.endYear)
+        : player.clubs;
+      const numClubs = filteredClubs.length;
       if (numClubs > 0) {
         const perpendicularAngle = angle + Math.PI / 2;
         const offsetPerClub = 8;
         
-        player.clubs.forEach((club, clubIndex) => {
+        filteredClubs.forEach((club, clubIndex) => {
           let clubX = Math.cos(angle - Math.PI / 2) * clubsRadius;
           let clubY = Math.sin(angle - Math.PI / 2) * clubsRadius;
           
@@ -741,14 +830,15 @@
         });
       }
 
-      // Assists count (fifth layer)
+      // Assists count (fifth layer) - use filtered value
       const assistsX = Math.cos(angle - Math.PI / 2) * assistsRadius;
       const assistsY = Math.sin(angle - Math.PI / 2) * assistsRadius;
+      const filteredAssists = getFilteredAssists(player);
       
       const assistsCircle = assistsLayer.append('circle')
         .attr('cx', assistsX)
         .attr('cy', assistsY)
-        .attr('r', Math.max(6, Math.min(16, player.career_assists / 8)))
+        .attr('r', Math.max(6, Math.min(16, filteredAssists / 8)))
         .attr('data-player-index', i)
         .attr('class', 'assists-circle')
         .style('fill', playerColor)
@@ -766,16 +856,17 @@
         .style('font-family', 'monospace')
         .style('font-weight', 'bold')
         .style('fill', 'var(--text-color)')
-        .text(player.career_assists || '0');
+        .text(filteredAssists || '0');
 
-      // Goals count (outermost layer)
+      // Goals count (outermost layer) - use filtered value
       const goalsX = Math.cos(angle - Math.PI / 2) * goalsRadius;
       const goalsY = Math.sin(angle - Math.PI / 2) * goalsRadius;
+      const filteredGoals = getFilteredGoals(player);
       
       const goalsCircle = goalsLayer.append('circle')
         .attr('cx', goalsX)
         .attr('cy', goalsY)
-        .attr('r', Math.max(8, Math.min(20, player.career_goals / 10)))
+        .attr('r', Math.max(8, Math.min(20, filteredGoals / 10)))
         .attr('data-player-index', i)
         .attr('class', 'goals-circle')
         .style('fill', playerColor)
@@ -793,7 +884,7 @@
         .style('font-family', 'monospace')
         .style('font-weight', 'bold')
         .style('fill', 'var(--text-color)')
-        .text(player.career_goals);
+        .text(filteredGoals);
     });
 
     function highlightPlayerData(playerIndex, playerColor) {
@@ -917,8 +1008,169 @@
       });
     }
 
+    // Helper function to convert color to greyscale
+    function toGrayscale(color) {
+      if (typeof color === 'string' && color.startsWith('var(')) {
+        return '#808080'; // Default grey for CSS variables
+      }
+      const rgb = d3.rgb(color);
+      // Convert to greyscale using luminance formula
+      const gray = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
+      return d3.rgb(gray, gray, gray).toString();
+    }
+
+    function applySelectionState() {
+      if (!selectedPlayer) {
+        // No selection: show everything normally
+        data.forEach((player, i) => {
+          const playerCountry = player.country_provenance || player.national_team || 'Unknown';
+          const playerColor = colorScale(playerCountry);
+          
+          // Reset player name
+          const nameGroup = namesLayer.select(`[data-player-name="${player.name}"]`);
+          if (!nameGroup.empty()) {
+            const nameText = nameGroup.select('.player-name');
+            if (!nameText.empty()) {
+              const normalFontSize = isMobile ? '11px' : '14px';
+              nameText
+                .style('font-weight', '500')
+                .style('font-size', normalFontSize)
+                .attr('font-size', normalFontSize)
+                .style('fill', playerColor)
+                .style('opacity', 1);
+            }
+          }
+          
+          // Reset connections
+          allConnections.forEach(conn => {
+            if (conn.player1 === player.name || conn.player2 === player.name) {
+              conn.path
+                .style('stroke', 'var(--viz-connection-color)')
+                .style('stroke-width', 1)
+                .style('opacity', 0.15);
+            }
+          });
+          
+          // Reset data elements
+          unhighlightPlayerData(i);
+        });
+        return;
+      }
+
+      // Get selected player's connections
+      const selectedConnections = findConnections(selectedPlayer, data);
+      const connectedPlayerNames = new Set([selectedPlayer.name]);
+      selectedConnections.forEach(conn => {
+        connectedPlayerNames.add(conn.player.name);
+      });
+
+      // Apply greyscale and reduced opacity to non-connected players
+      data.forEach((player, i) => {
+        const playerCountry = player.country_provenance || player.national_team || 'Unknown';
+        const playerColor = colorScale(playerCountry);
+        const isConnected = connectedPlayerNames.has(player.name);
+        
+        if (isConnected) {
+          // Keep full color and opacity for selected player and connections
+          const nameGroup = namesLayer.select(`[data-player-name="${player.name}"]`);
+          if (!nameGroup.empty()) {
+            const nameText = nameGroup.select('.player-name');
+            if (!nameText.empty()) {
+              const fontSize = isMobile ? '11px' : '14px';
+              nameText
+                .style('fill', playerColor)
+                .style('opacity', 1);
+            }
+          }
+          
+          // Highlight connections
+          allConnections.forEach(conn => {
+            if ((conn.player1 === player.name && connectedPlayerNames.has(conn.player2)) ||
+                (conn.player2 === player.name && connectedPlayerNames.has(conn.player1))) {
+              const connColor = conn.player1 === selectedPlayer.name || conn.player2 === selectedPlayer.name 
+                ? playerColor 
+                : colorScale(data.find(p => p.name === (conn.player1 === player.name ? conn.player2 : conn.player1))?.country_provenance || 'Unknown');
+              conn.path
+                .style('stroke', connColor)
+                .style('stroke-width', 2)
+                .style('opacity', 0.6);
+            }
+          });
+          
+          // Highlight data elements for selected player
+          if (player.name === selectedPlayer.name) {
+            highlightPlayerData(i, playerColor);
+          }
+        } else {
+          // Grey out non-connected players
+          const grayColor = toGrayscale(playerColor);
+          const reducedOpacity = 0.25;
+          
+          const nameGroup = namesLayer.select(`[data-player-name="${player.name}"]`);
+          if (!nameGroup.empty()) {
+            const nameText = nameGroup.select('.player-name');
+            if (!nameText.empty()) {
+              nameText
+                .style('fill', grayColor)
+                .style('opacity', reducedOpacity);
+            }
+            const underline = nameGroup.select('line');
+            if (!underline.empty()) {
+              underline.style('opacity', 0);
+            }
+          }
+          
+          // Grey out connections
+          allConnections.forEach(conn => {
+            if (conn.player1 === player.name || conn.player2 === player.name) {
+              conn.path
+                .style('stroke', grayColor)
+                .style('stroke-width', 1)
+                .style('opacity', reducedOpacity * 0.6);
+            }
+          });
+          
+          // Grey out data elements
+          nationalTeamLayer.selectAll(`text.country-text[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          
+          clubsLayer.selectAll(`circle.club-dot[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          
+          assistsLayer.selectAll(`circle.assists-circle[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          assistsLayer.selectAll(`text.assists-text[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          
+          goalsLayer.selectAll(`circle.goals-circle[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          goalsLayer.selectAll(`text.goals-text[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          
+          // Grey out connection point
+          g.selectAll(`circle.connection-point[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+        }
+      });
+    }
+    
+    // Store reference to function for external access
+    applySelectionStateFn = applySelectionState;
+
     function hideConnections() {
-      // Reset all connections back to light color
+      // Reset all connections back to light color (but respect selection)
+      if (selectedPlayer) {
+        applySelectionState(); // Reapply selection state
+        return;
+      }
+      
       allConnections.forEach(conn => {
         conn.path
           .style('stroke', 'var(--viz-connection-color)')
@@ -1001,7 +1253,7 @@
       const iconX = Math.cos(legendAngle - Math.PI / 2) * adjustedRadius;
       const iconY = Math.sin(legendAngle - Math.PI / 2) * adjustedRadius;
       
-      const iconSize = isMobile ? 10 : 14;
+      const iconSize = isMobile ? 14 : 18;
       
       const iconGroup = legendsLayer.append('g')
         .attr('class', `legend-icon-${config.label.toLowerCase()}`)
@@ -1044,8 +1296,30 @@
 <div class="visualization-container">
   <div class="visualization-header">
     <h2>Player Network</h2>
-      <p>Hover over a player's name to see connections with teammates. Hover over club dots to see club names. Colors represent countries. Outer rings show goals, assists, clubs, and nationality.</p>
+    <p>Hover over a player's name to see connections with teammates. Click to highlight a player's network. Hover over club dots to see club names. Colors represent countries. Outer rings show goals, assists, clubs, and nationality.</p>
+    
     <p class="attribution">Visualization style inspired by <a href="https://yanouski.com/projects/xfiles-writers/" target="_blank" rel="noopener noreferrer">X-Files Writers Network</a>.</p>
+    
+    <div class="filters-container">
+      <div class="filter-group">
+        <label for="career-type-filter">Career Type:</label>
+        <select id="career-type-filter" bind:value={careerTypeFilter}>
+          <option value="cumulative">Cumulative</option>
+          <option value="club">Club Career</option>
+          <option value="international">International Career</option>
+        </select>
+      </div>
+      
+      <div class="filter-group">
+        <label for="year-filter">Year:</label>
+        <select id="year-filter" bind:value={selectedYear}>
+          <option value={null}>All Years</option>
+          {#each Array.from({length: new Date().getFullYear() - 2000 + 1}, (_, i) => 2000 + i).reverse() as year}
+            <option value={year}>{year}</option>
+          {/each}
+        </select>
+      </div>
+    </div>
   </div>
 
   {#if loading}
@@ -1053,7 +1327,33 @@
   {:else if error}
     <div class="error">Error: {error}</div>
   {:else}
-    <div class="chart-container" bind:this={container}></div>
+    <div class="chart-container" bind:this={container}>
+      {#if playerInfoCard}
+        <div class="player-info-card">
+          <button class="close-btn" on:click={() => { selectedPlayer = null; playerInfoCard = null; }} aria-label="Close">×</button>
+          <h3>{playerInfoCard.name}</h3>
+          <div class="player-info-details">
+            <p><strong>National Team:</strong> {playerInfoCard.national_team}</p>
+            <p><strong>Career Goals:</strong> {playerInfoCard.career_goals}</p>
+            <p><strong>Career Assists:</strong> {playerInfoCard.career_assists || 0}</p>
+            <p><strong>Club Goals:</strong> {playerInfoCard.club_goals || 0}</p>
+            <p><strong>Club Assists:</strong> {playerInfoCard.club_assists || 0}</p>
+            <p><strong>International Goals:</strong> {playerInfoCard.international_goals || 0}</p>
+            <p><strong>International Assists:</strong> {playerInfoCard.international_assists || 0}</p>
+            <p><strong>Clubs:</strong> {playerInfoCard.clubs.map(c => c.name + (c.startYear && c.endYear ? ` (${c.startYear}-${c.endYear})` : '')).join(', ')}</p>
+          </div>
+        </div>
+      {/if}
+    </div>
+    
+    <div class="data-attribution">
+      {#if dataLastUpdated}
+        <p class="data-date">Data current as of: <strong>{dataLastUpdated}</strong></p>
+      {/if}
+      {#if dataSource}
+        <p class="data-source">Data source: <strong>{dataSource}</strong></p>
+      {/if}
+    </div>
   {/if}
 </div>
 
@@ -1077,6 +1377,58 @@
     margin: 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
+  }
+
+  .filters-container {
+    display: flex;
+    gap: 1.5rem;
+    margin: 1rem 0;
+    flex-wrap: wrap;
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .filter-group label {
+    font-size: 0.9rem;
+    color: var(--text-color);
+    font-weight: 500;
+  }
+
+  .filter-group select {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--viz-stroke-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .filter-group select:hover {
+    border-color: var(--primary-color);
+  }
+
+  .filter-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-color-rgb, 0, 123, 255), 0.2);
+  }
+
+  .data-attribution p {
+    margin: 0.25rem 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    display: inline;
+    margin-right: 1rem;
+  }
+
+  .data-attribution p:last-child {
+    margin-right: 0;
   }
 
   .visualization-header p.attribution {
@@ -1104,6 +1456,75 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    position: relative;
+  }
+
+  .player-info-card {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--viz-stroke-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    max-width: 300px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+  }
+
+  .player-info-card h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-color);
+    font-size: 1.25rem;
+    border-bottom: 2px solid var(--viz-stroke-color);
+    padding-bottom: 0.5rem;
+  }
+
+  .player-info-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .player-info-details p {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-color);
+  }
+
+  .player-info-details strong {
+    color: var(--text-secondary);
+    margin-right: 0.5rem;
+  }
+
+  .close-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    width: 2rem;
+    height: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+  }
+
+  .close-btn:hover {
+    background: var(--bg-secondary);
+    color: var(--text-color);
+  }
+
+  .data-attribution {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    text-align: center;
+    opacity: 0.7;
   }
 
   .loading, .error {
