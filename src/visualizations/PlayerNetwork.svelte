@@ -973,6 +973,7 @@
   <div class="visualization-header">
     <h2>Player Network</h2>
     <p>Hover over a player's name to see connections with teammates. Hover over club dots to see club names. Colors represent countries. Outer rings show goals, clubs, and national team.</p>
+    <p class="attribution">Visualization style inspired by <a href="https://yanouski.com/projects/xfiles-writers/" target="_blank" rel="noopener noreferrer">X-Files Writers Network</a>.</p>
   </div>
 
   {#if loading}
@@ -1004,6 +1005,21 @@
     margin: 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
+  }
+
+  .visualization-header p.attribution {
+    margin-top: 0.5rem;
+    font-size: 0.85rem;
+    opacity: 0.8;
+  }
+
+  .visualization-header p.attribution a {
+    color: var(--primary-color);
+    text-decoration: underline;
+  }
+
+  .visualization-header p.attribution a:hover {
+    opacity: 0.8;
   }
 
   .chart-container {

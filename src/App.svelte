@@ -10,8 +10,8 @@
   let menuOpen = false;
 
   const menuItems = [
-    { label: 'Player Network', href: '#player-network' },
     { label: 'Player Network (Alt)', href: '#player-network-alt' },
+    { label: 'Player Network', href: '#player-network' },
     { label: 'Player Success', href: '#player-success' },
   ];
 
@@ -40,12 +40,12 @@
       <ThemeToggle />
     </header>
 
-    <section id="player-network" class="visualization-section">
-      <PlayerNetwork />
-    </section>
-
     <section id="player-network-alt" class="visualization-section">
       <PlayerNetworkAlt />
+    </section>
+
+    <section id="player-network" class="visualization-section">
+      <PlayerNetwork />
     </section>
 
     <section id="player-success" class="visualization-section">
