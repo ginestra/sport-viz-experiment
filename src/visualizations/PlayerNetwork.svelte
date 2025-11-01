@@ -247,6 +247,34 @@
   let prevCareerTypeFilter = 'cumulative';
   let prevSelectedYear = null;
   
+  // Track previous selection state to detect changes
+  let prevSelectedPlayer = null;
+  
+  // React to selection changes - recreate visualization to resize (desktop only)
+  // On mobile, we don't resize, just show/hide the canvas
+  $: if (visualizationCreated && container && data.length > 0 && 
+         selectedPlayer !== prevSelectedPlayer && !checkIsMobile()) {
+    prevSelectedPlayer = selectedPlayer;
+    visualizationCreated = false;
+    setTimeout(() => {
+      visualizationCreated = true;
+      createVisualization();
+      setupResizeObserver();
+      if (selectedPlayer && applySelectionStateFn) {
+        setTimeout(() => applySelectionStateFn(), 0);
+      }
+    }, 0);
+  }
+  
+  // On mobile, just update selection state without recreating
+  $: if (visualizationCreated && container && data.length > 0 && 
+         selectedPlayer !== prevSelectedPlayer && checkIsMobile()) {
+    prevSelectedPlayer = selectedPlayer;
+    if (selectedPlayer && applySelectionStateFn) {
+      setTimeout(() => applySelectionStateFn(), 0);
+    }
+  }
+  
   // React to filter changes - recreate visualization
   $: if (visualizationCreated && container && data.length > 0 && 
          (careerTypeFilter !== prevCareerTypeFilter || selectedYear !== prevSelectedYear)) {
@@ -273,8 +301,10 @@
     // Check if mobile
     isMobile = checkIsMobile();
 
+    // Account for reduced container width when player is selected (60% of full width) - desktop only
     const containerWidth = container.clientWidth || 900;
-    const size = Math.min(containerWidth - 40, isMobile ? 600 : 900);
+    const effectiveWidth = (selectedPlayer && !isMobile) ? containerWidth * (1 / 0.6) : containerWidth;
+    const size = Math.min(effectiveWidth - 40, isMobile ? 600 : 900);
     // Add padding for outer labels (less padding on mobile)
     const padding = isMobile ? 40 : 80;
     const width = size + (padding * 2);
@@ -1474,23 +1504,31 @@
   {:else if error}
     <div class="error">Error: {error}</div>
   {:else}
-    <div class="chart-container" bind:this={container}>
-      {#if playerInfoCard}
-        <div class="player-info-card">
+    <div class="visualization-wrapper" class:has-selection={selectedPlayer}>
+      <div class="chart-container" bind:this={container}>
+      </div>
+      
+      <div class="player-canvas" class:visible={playerInfoCard}>
+        <div class="player-canvas-content">
           <button class="close-btn" on:click={() => { selectedPlayer = null; playerInfoCard = null; }} aria-label="Close">×</button>
-          <h3>{playerInfoCard.name}</h3>
-          <div class="player-info-details">
-            <p><strong>National Team:</strong> {playerInfoCard.national_team}</p>
-            <p><strong>Career Goals:</strong> {playerInfoCard.career_goals}</p>
-            <p><strong>Career Assists:</strong> {playerInfoCard.career_assists || 0}</p>
-            <p><strong>Club Goals:</strong> {playerInfoCard.club_goals || 0}</p>
-            <p><strong>Club Assists:</strong> {playerInfoCard.club_assists || 0}</p>
-            <p><strong>International Goals:</strong> {playerInfoCard.international_goals || 0}</p>
-            <p><strong>International Assists:</strong> {playerInfoCard.international_assists || 0}</p>
-            <p><strong>Clubs:</strong> {playerInfoCard.clubs.map(c => c.name + (c.startYear && c.endYear ? ` (${c.startYear}-${c.endYear})` : '')).join(', ')}</p>
-          </div>
+          {#if playerInfoCard}
+            <h3>{playerInfoCard.name}</h3>
+            <div class="player-info-details">
+              <p><strong>National Team:</strong> {playerInfoCard.national_team}</p>
+              <p><strong>Career Goals:</strong> {playerInfoCard.career_goals}</p>
+              <p><strong>Career Assists:</strong> {playerInfoCard.career_assists || 0}</p>
+              <p><strong>Career Appearances:</strong> {playerInfoCard.career_appearances || 0}</p>
+              <p><strong>Club Goals:</strong> {playerInfoCard.club_goals || 0}</p>
+              <p><strong>Club Assists:</strong> {playerInfoCard.club_assists || 0}</p>
+              <p><strong>Club Appearances:</strong> {playerInfoCard.club_appearances || 0}</p>
+              <p><strong>International Goals:</strong> {playerInfoCard.international_goals || 0}</p>
+              <p><strong>International Assists:</strong> {playerInfoCard.international_assists || 0}</p>
+              <p><strong>International Appearances:</strong> {playerInfoCard.international_appearances || 0}</p>
+              <p><strong>Clubs:</strong> {playerInfoCard.clubs.map(c => c.name + (c.startYear && c.endYear ? ` (${c.startYear}-${c.endYear})` : '')).join(', ')}</p>
+            </div>
+          {/if}
         </div>
-      {/if}
+      </div>
     </div>
     
     <div class="data-attribution">
@@ -1607,6 +1645,17 @@
     opacity: 0.8;
   }
 
+  .visualization-wrapper {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .visualization-wrapper.has-selection {
+    flex-direction: row;
+  }
+
   .chart-container {
     width: 100%;
     overflow: visible;
@@ -1618,53 +1667,78 @@
     justify-content: center;
     align-items: center;
     position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 1;
   }
 
-  .player-info-card {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
+  .visualization-wrapper.has-selection .chart-container {
+    width: 60%;
+    flex-shrink: 0;
+    min-height: 500px;
+  }
+
+  .player-canvas {
+    flex-shrink: 0;
+    width: 0;
+    opacity: 0;
+    overflow: hidden;
     background: var(--bg-primary);
     border: 1px solid var(--viz-stroke-color);
     border-radius: 8px;
-    padding: 1.5rem;
-    max-width: 300px;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    z-index: 10;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(100%);
+    max-height: none;
   }
 
-  .player-info-card h3 {
-    margin: 0 0 1rem 0;
+  .player-canvas.visible {
+    width: 38%;
+    opacity: 1;
+    transform: translateX(0);
+    max-height: none;
+    flex-shrink: 0;
+  }
+
+  .player-canvas-content {
+    padding: 2rem;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .player-canvas-content h3 {
+    margin: 0 0 1.5rem 0;
     color: var(--text-color);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     border-bottom: 2px solid var(--viz-stroke-color);
-    padding-bottom: 0.5rem;
+    padding-bottom: 0.75rem;
   }
 
   .player-info-details {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 0.75rem;
   }
 
   .player-info-details p {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     color: var(--text-color);
+    line-height: 1.5;
   }
 
   .player-info-details strong {
     color: var(--text-secondary);
     margin-right: 0.5rem;
+    font-weight: 600;
   }
 
   .close-btn {
     position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
+    top: 1rem;
+    right: 1rem;
     background: transparent;
     border: none;
-    font-size: 1.5rem;
+    font-size: 1.75rem;
     color: var(--text-secondary);
     cursor: pointer;
     width: 2rem;
@@ -1711,9 +1785,68 @@
       font-size: 1.25rem;
     }
 
+    .visualization-wrapper {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: stretch;
+      width: 100%;
+    }
+
+    .visualization-wrapper.has-selection {
+      flex-direction: column; /* Keep column on mobile even with selection */
+    }
+
+    .visualization-wrapper.has-selection .chart-container {
+      width: 100%;
+      flex-shrink: 0;
+      min-height: 400px;
+      height: auto;
+    }
+
     .chart-container {
       padding: 1rem;
       min-height: 400px;
+      transition: none; /* Disable transitions on mobile to prevent collapse */
+      width: 100%;
+      flex-shrink: 0;
+      height: auto;
+    }
+
+    .player-canvas {
+      width: 100% !important;
+      min-width: 100% !important;
+      max-width: 100% !important;
+      order: -1; /* Place canvas before chart on mobile */
+      max-height: 0;
+      overflow: hidden;
+      opacity: 0;
+      transform: none !important; /* Override desktop translateX */
+      transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative !important; /* Ensure it's in normal flow */
+      flex-shrink: 0 !important; /* Prevent collapsing */
+      flex-grow: 0; /* Don't grow */
+      box-sizing: border-box;
+    }
+
+    .player-canvas.visible {
+      width: 100% !important;
+      min-width: 100% !important;
+      max-width: 100% !important;
+      max-height: 600px;
+      opacity: 1;
+      transform: none !important; /* Override desktop translateX */
+      margin-bottom: 0;
+      position: relative !important; /* Ensure it's in normal flow */
+      flex-shrink: 0 !important; /* Prevent collapsing */
+      flex-grow: 0; /* Don't grow */
+      box-sizing: border-box;
+    }
+    
+    .player-canvas-content {
+      min-width: 0; /* Prevent content from forcing width */
+      white-space: normal; /* Allow text to wrap */
+      width: 100%;
+      box-sizing: border-box;
     }
   }
 </style>
