@@ -17,7 +17,11 @@
   let careerTypeFilter = 'cumulative'; // 'cumulative', 'club', 'international'
   let selectedYear = null; // null = show all aggregated
   let dataLastUpdated = null; // Last update date for data
-  let dataSource = 'Various online sources'; // Data source attribution - update with actual source
+  let dataSources = [
+    { name: 'Wikipedia', url: 'https://en.wikipedia.org/wiki/Women\'s_association_football' },
+    { name: 'Transfermarkt', url: 'https://www.transfermarkt.com/wettbewerbe/frauen' },
+    { name: 'FIFA', url: 'https://www.fifa.com/fifaplus/en/tournaments/womens/womensworldcup' }
+  ]; // Data sources with links
   let playerInfoCard = null; // Selected player for info card
 
   // Helper function to get last name from full name
@@ -70,10 +74,13 @@
         ...d,
         career_goals: +d.career_goals || 0,
         career_assists: +d.career_assists || 0,
+        career_appearances: +d.career_appearances || 0,
         club_goals: +d.club_goals || 0,
         club_assists: +d.club_assists || 0,
+        club_appearances: +d.club_appearances || 0,
         international_goals: +d.international_goals || 0,
         international_assists: +d.international_assists || 0,
+        international_appearances: +d.international_appearances || 0,
         clubs: clubs,
         national_team: d.national_team || d.country_provenance
       };
@@ -100,6 +107,17 @@
         return player.international_assists || 0;
       default:
         return player.career_assists || 0;
+    }
+  }
+  
+  function getFilteredAppearances(player) {
+    switch (careerTypeFilter) {
+      case 'club':
+        return parseInt(player.club_appearances || player.career_appearances || 0);
+      case 'international':
+        return parseInt(player.international_appearances || 0);
+      default:
+        return parseInt(player.career_appearances || 0);
     }
   }
 
@@ -285,14 +303,15 @@
 
     const tooltip = createTooltip();
 
-    // NEW ORDER: Define radii for different rings (from inner to outer: network, player names, country, clubs, assists, goals)
+    // NEW ORDER: Define radii for different rings (from inner to outer: network, player names, country, clubs, appearances, assists, goals)
     const radiusMultiplier = isMobile ? 0.9 : 1.0; // Slightly smaller on mobile
     const innerRadius = size * 0.08 * radiusMultiplier;  // Connection points (network - stays same)
     const nameMargin = 2.5; // Margin between player names and connection circles (in pixels)
     const playerNameRadius = size * 0.12 * radiusMultiplier + nameMargin;  // Player names (second layer) - closer to network circle with margin
     const nationalTeamRadius = size * 0.32 * radiusMultiplier;  // National team names (third layer) - increased for more distance from player names
     const clubsRadius = size * 0.39 * radiusMultiplier;  // Club dots (fourth layer) - adjusted to maintain spacing
-    const assistsRadius = size * 0.46 * radiusMultiplier;  // Assists count (fifth layer) - adjusted to maintain spacing
+    const appearancesRadius = size * 0.425 * radiusMultiplier;  // Appearances count (fifth layer) - between clubs and assists
+    const assistsRadius = size * 0.46 * radiusMultiplier;  // Assists count (sixth layer) - adjusted to maintain spacing
     const goalsRadius = size * 0.53 * radiusMultiplier;  // Goals count (outermost layer) - adjusted to maintain spacing
 
     // Create color scale by country - filter out undefined/null values
@@ -471,6 +490,17 @@
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
     
+    // Appearances circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', appearancesRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--viz-circle-stroke)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
     // Assists circle
     circlesLayer.append('circle')
       .attr('cx', 0)
@@ -548,6 +578,7 @@
     const namesLayer = g.append('g').attr('class', 'names-layer');
     const nationalTeamLayer = g.append('g').attr('class', 'national-team-layer');
     const clubsLayer = g.append('g').attr('class', 'clubs-layer');
+    const appearancesLayer = g.append('g').attr('class', 'appearances-layer');
     const assistsLayer = g.append('g').attr('class', 'assists-layer');
     const goalsLayer = g.append('g').attr('class', 'goals-layer');
     
@@ -830,7 +861,35 @@
         });
       }
 
-      // Assists count (fifth layer) - use filtered value
+      // Appearances count (fifth layer) - between clubs and assists - use filtered value
+      const appearancesX = Math.cos(angle - Math.PI / 2) * appearancesRadius;
+      const appearancesY = Math.sin(angle - Math.PI / 2) * appearancesRadius;
+      const filteredAppearances = getFilteredAppearances(player);
+      
+      const appearancesCircle = appearancesLayer.append('circle')
+        .attr('cx', appearancesX)
+        .attr('cy', appearancesY)
+        .attr('r', Math.max(6, Math.min(18, filteredAppearances / 15)))
+        .attr('data-player-index', i)
+        .attr('class', 'appearances-circle')
+        .style('fill', playerColor)
+        .style('opacity', 0.5);
+        
+      const appearancesFontSize = isMobile ? '8px' : '10px';
+      appearancesLayer.append('text')
+        .attr('x', appearancesX)
+        .attr('y', appearancesY)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .attr('data-player-index', i)
+        .attr('class', 'appearances-text')
+        .style('font-size', appearancesFontSize)
+        .style('font-family', 'monospace')
+        .style('font-weight', 'bold')
+        .style('fill', 'var(--text-color)')
+        .text(filteredAppearances || '0');
+
+      // Assists count (sixth layer) - use filtered value
       const assistsX = Math.cos(angle - Math.PI / 2) * assistsRadius;
       const assistsY = Math.sin(angle - Math.PI / 2) * assistsRadius;
       const filteredAssists = getFilteredAssists(player);
@@ -900,6 +959,15 @@
         .style('opacity', 1)
         .style('stroke-width', 2);
       
+      // Highlight appearances
+      appearancesLayer.selectAll(`circle.appearances-circle[data-player-index="${playerIndex}"]`)
+        .style('opacity', 0.8)
+        .style('stroke', playerColor)
+        .style('stroke-width', 2);
+      appearancesLayer.selectAll(`text.appearances-text[data-player-index="${playerIndex}"]`)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '10px' : '12px');
+      
       // Highlight assists
       assistsLayer.selectAll(`circle.assists-circle[data-player-index="${playerIndex}"]`)
         .style('opacity', 0.8)
@@ -931,6 +999,15 @@
         .attr('r', 5)
         .style('opacity', 0.8)
         .style('stroke-width', 1);
+      
+      // Reset appearances
+      appearancesLayer.selectAll(`circle.appearances-circle[data-player-index="${playerIndex}"]`)
+        .style('opacity', 0.5)
+        .style('stroke', 'none')
+        .style('stroke-width', 0);
+      appearancesLayer.selectAll(`text.appearances-text[data-player-index="${playerIndex}"]`)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '8px' : '10px');
       
       // Reset assists
       assistsLayer.selectAll(`circle.assists-circle[data-player-index="${playerIndex}"]`)
@@ -1139,6 +1216,13 @@
             .style('fill', grayColor)
             .style('opacity', reducedOpacity);
           
+          appearancesLayer.selectAll(`circle.appearances-circle[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          appearancesLayer.selectAll(`text.appearances-text[data-player-index="${i}"]`)
+            .style('fill', grayColor)
+            .style('opacity', reducedOpacity);
+          
           assistsLayer.selectAll(`circle.assists-circle[data-player-index="${i}"]`)
             .style('fill', grayColor)
             .style('opacity', reducedOpacity);
@@ -1225,6 +1309,7 @@
       { radius: playerNameRadius, path: 'M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z', viewBox: '0 0 448 512', label: 'Player' },
       { radius: nationalTeamRadius, path: 'M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z', viewBox: '0 0 448 512', label: 'Country' },
       { radius: clubsRadius, path: 'M256 0c4.6 0 9.2 1 13.4 2.9L457.8 82.8c22 9.3 38.4 31 38.3 57.2-.5 99.2-41.3 280.7-213.6 363.2-16.7 8-36.1 8-52.8 0-172.4-82.5-213.1-264-213.6-363.2-.1-26.2 16.3-47.9 38.3-57.2L242.7 2.9C246.9 1 251.4 0 256 0z', viewBox: '0 0 512 512', label: 'Clubs' },
+      { radius: appearancesRadius, path: 'M48 195.8l209.2 86.1c9.8 4 20.2 6.1 30.8 6.1s21-2.1 30.8-6.1l242.4-99.8c9-3.7 14.8-12.4 14.8-22.1s-5.8-18.4-14.8-22.1L318.8 38.1C309 34.1 298.6 32 288 32s-21 2.1-30.8 6.1L14.8 137.9C5.8 141.6 0 150.3 0 160L0 456c0 13.3 10.7 24 24 24s24-10.7 24-24l0-260.2zm48 71.7L96 384c0 53 86 96 192 96s192-43 192-96l0-116.6-142.9 58.9c-15.6 6.4-32.2 9.7-49.1 9.7s-33.5-3.3-49.1-9.7L96 267.4z', viewBox: '0 0 576 512', label: 'Appearances' },
       { radius: assistsRadius, path: 'M256.5-32a56 56 0 1 1 0 112 56 56 0 1 1 0-112zM123.6 176c-3.3 0-6.2 2-7.4 5L94.2 235.9c-6.6 16.4-25.2 24.4-41.6 17.8s-24.4-25.2-17.8-41.6l21.9-54.9C67.7 129.9 94.1 112 123.6 112l97.3 0c28.5 0 54.8 15.1 69.1 39.7l32.8 56.3 61.6 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-61.6 0c-22.8 0-43.8-12.1-55.3-31.8l-10-17.1-20.7 70.4 75.4 22.6c27.7 8.3 41.8 39 30.1 65.5L285.7 509c-7.2 16.2-26.1 23.4-42.2 16.2s-23.4-26.1-16.2-42.2l49.2-110.8-95.9-28.8c-32.7-9.8-52-43.7-43.7-76.8l22.7-90.6-35.9 0zm-8 181c13.3 14.9 30.7 26.3 51.2 32.4l4.7 1.4-6.9 19.3c-5.8 16.3-16 30.8-29.3 41.8L52.9 519.8c-13.6 11.2-33.8 9.3-45-4.3s-9.3-33.8 4.3-45l82.4-67.9c4.5-3.7 7.8-8.5 9.8-13.9L115.6 357z', viewBox: '0 0 448 512', label: 'Assists' },
       { radius: goalsRadius, path: 'M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6l59.2 0c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z', viewBox: '0 0 512 512', label: 'Goals' }
     ];
@@ -1350,8 +1435,13 @@
       {#if dataLastUpdated}
         <p class="data-date">Data current as of: <strong>{dataLastUpdated}</strong></p>
       {/if}
-      {#if dataSource}
-        <p class="data-source">Data source: <strong>{dataSource}</strong></p>
+      {#if dataSources && dataSources.length > 0}
+        <p class="data-source">
+          Data sources: 
+          {#each dataSources as source, index}
+            <a href={source.url} target="_blank" rel="noopener noreferrer">{source.name}</a>{index < dataSources.length - 1 ? ', ' : ''}
+          {/each}
+        </p>
       {/if}
     </div>
   {/if}
@@ -1429,6 +1519,15 @@
 
   .data-attribution p:last-child {
     margin-right: 0;
+  }
+
+  .data-attribution a {
+    color: var(--primary-color);
+    text-decoration: underline;
+  }
+
+  .data-attribution a:hover {
+    opacity: 0.8;
   }
 
   .visualization-header p.attribution {
