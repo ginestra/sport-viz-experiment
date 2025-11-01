@@ -11,6 +11,19 @@
   let resizeObserver;
   let hoveredPlayer = null;
   let svg, g;
+  let isMobile = false;
+
+  // Helper function to get last name from full name
+  function getLastName(fullName) {
+    const parts = fullName.trim().split(' ');
+    return parts.length > 1 ? parts[parts.length - 1] : fullName;
+  }
+
+  // Check if screen is small (mobile)
+  function checkIsMobile() {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768; // Tablet breakpoint
+  }
 
   // Map country names to ISO country codes
   function getCountryCode(countryName) {
@@ -173,10 +186,13 @@
 
     d3.select(container).selectAll('*').remove();
 
+    // Check if mobile
+    isMobile = checkIsMobile();
+
     const containerWidth = container.clientWidth || 900;
-    const size = Math.min(containerWidth - 40, 900);
-    // Add padding for outer labels
-    const padding = 80;
+    const size = Math.min(containerWidth - 40, isMobile ? 600 : 900);
+    // Add padding for outer labels (less padding on mobile)
+    const padding = isMobile ? 40 : 80;
     const width = size + (padding * 2);
     const height = size + (padding * 2);
     const centerX = width / 2;
@@ -195,13 +211,14 @@
 
     const tooltip = createTooltip();
 
-    // Define radii for different rings
-    const innerRadius = size * 0.08;  // Connection points (centers for connections)
-    const goalsRadius = size * 0.18;  // Goals count
-    const assistsRadius = size * 0.23;  // Assists count (between goals and clubs)
-    const clubsRadius = size * 0.28;  // Club dots
-    const nationalTeamRadius = size * 0.32; // National team names (closer to club dots, uniform distance)
-    const playerNameRadius = size * 0.42; // Player names (moved closer to center)
+    // Define radii for different rings (adjusted for mobile)
+    const radiusMultiplier = isMobile ? 0.9 : 1.0; // Slightly smaller on mobile
+    const innerRadius = size * 0.08 * radiusMultiplier;  // Connection points (centers for connections)
+    const goalsRadius = size * 0.18 * radiusMultiplier;  // Goals count
+    const assistsRadius = size * 0.23 * radiusMultiplier;  // Assists count (between goals and clubs)
+    const clubsRadius = size * 0.28 * radiusMultiplier;  // Club dots
+    const nationalTeamRadius = size * 0.32 * radiusMultiplier; // National team names (closer to club dots, uniform distance)
+    const playerNameRadius = size * 0.42 * radiusMultiplier; // Player names (moved closer to center)
 
     // Create color scale by country - filter out undefined/null values
     let countryValues = [];
@@ -554,14 +571,18 @@
         .attr('transform', `translate(${playerNameX}, ${playerNameY}) rotate(${radialRotation})`)
         .style('cursor', 'pointer');
       
+      // Determine display name based on screen size
+      const displayName = isMobile ? getLastName(player.name) : player.name;
+      const fontSize = isMobile ? '11px' : '14px';
+      
       // Add text first to measure it (temporarily hidden)
       const tempText = nameGroup.append('text')
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .style('font-size', '14px')
+        .style('font-size', fontSize)
         .style('font-weight', '500')
         .style('visibility', 'hidden')
-        .text(player.name);
+        .text(displayName);
       
       // Measure text and create background
       let textWidth = 0;
@@ -592,20 +613,21 @@
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
         .attr('class', 'player-name')
-        .style('font-size', '14px')
+        .style('font-size', fontSize)
         .style('font-family', 'monospace')
         .style('fill', playerColor)
         .style('font-weight', '500')
-        .text(player.name);
+        .text(displayName);
       
       // Add hover handlers to the group
       nameGroup
         .on('mouseenter', function(event) {
           hoveredPlayer = player;
           showConnections(player, i);
+          const hoverFontSize = isMobile ? '13px' : '16px';
           nameText
             .style('font-weight', 'bold')
-            .style('font-size', '16px')
+            .style('font-size', hoverFontSize)
             .style('fill', d3.rgb(playerColor).darker(0.3).toString()); // Darken text slightly for contrast
           underline.style('opacity', 1);
           
@@ -625,10 +647,11 @@
         .on('mouseleave', function() {
           hoveredPlayer = null;
           hideConnections();
-          nameText
-            .style('font-weight', '500')
-            .style('font-size', '14px')
-            .style('fill', playerColor); // Restore original color
+              const normalFontSize = isMobile ? '11px' : '14px';
+              nameText
+                .style('font-weight', '500')
+                .style('font-size', normalFontSize)
+                .style('fill', playerColor); // Restore original color
           underline.style('opacity', 0);
           tooltip.transition()
             .duration(200)
@@ -646,12 +669,13 @@
         .style('fill', playerColor)
         .style('opacity', 0.6);
         
+      const goalsFontSize = isMobile ? '9px' : '11px';
       goalsLayer.append('text')
         .attr('x', goalsX)
         .attr('y', goalsY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .style('font-size', '11px')
+        .style('font-size', goalsFontSize)
         .style('font-family', 'monospace')
         .style('font-weight', 'bold')
         .style('fill', 'var(--text-color)')
@@ -668,12 +692,13 @@
         .style('fill', playerColor)
         .style('opacity', 0.5);
         
+      const assistsFontSize = isMobile ? '8px' : '10px';
       assistsLayer.append('text')
         .attr('x', assistsX)
         .attr('y', assistsY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .style('font-size', '10px')
+        .style('font-size', assistsFontSize)
         .style('font-family', 'monospace')
         .style('font-weight', 'bold')
         .style('fill', 'var(--text-color)')
@@ -744,13 +769,14 @@
       const natTeamY = Math.sin(angle - Math.PI / 2) * nationalTeamRadius;
       const countryCode = getCountryCode(player.national_team).toUpperCase();
       
+      const countryFontSize = isMobile ? '10px' : '12px';
       nationalTeamLayer.append('text')
         .attr('x', natTeamX)
         .attr('y', natTeamY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
         .attr('transform', `rotate(${radialRotation}, ${natTeamX}, ${natTeamY})`)
-        .style('font-size', '12px')
+        .style('font-size', countryFontSize)
         .style('font-family', 'monospace')
         .style('fill', playerColor)
         .style('opacity', 0.8)
@@ -766,14 +792,15 @@
       connections.forEach(conn => {
         const connectedNameGroup = namesLayer.select(`[data-player-name="${conn.player.name}"]`);
         if (!connectedNameGroup.empty()) {
-          const connectedNameText = connectedNameGroup.select('.player-name');
-          if (!connectedNameText.empty()) {
-            const connPlayerColor = colorScale(conn.player.country_provenance || conn.player.national_team || 'Unknown');
-            connectedNameText
-              .style('font-weight', 'bold')
-              .style('font-size', '16px')
-              .style('opacity', 1)
-              .style('fill', d3.rgb(connPlayerColor).darker(0.2).toString());
+            const connectedNameText = connectedNameGroup.select('.player-name');
+            if (!connectedNameText.empty()) {
+              const connPlayerColor = colorScale(conn.player.country_provenance || conn.player.national_team || 'Unknown');
+              const connectedFontSize = isMobile ? '13px' : '16px';
+              connectedNameText
+                .style('font-weight', 'bold')
+                .style('font-size', connectedFontSize)
+                .style('opacity', 1)
+                .style('fill', d3.rgb(connPlayerColor).darker(0.2).toString());
           }
           // Show underline for connected players
           const connectedUnderline = connectedNameGroup.select('line');
@@ -809,16 +836,17 @@
         const playerName = group.attr('data-player-name');
         const playerData = data.find(p => p.name === playerName);
         
-        if (playerData) {
-          const playerCountry = playerData.country_provenance || playerData.national_team || 'Unknown';
-          const playerColor = colorScale(playerCountry);
-          
-          group.select('.player-name')
-            .style('font-weight', '500')
-            .style('font-size', '14px')
-            .style('opacity', 1)
-            .style('fill', playerColor);
-        }
+            if (playerData) {
+              const playerCountry = playerData.country_provenance || playerData.national_team || 'Unknown';
+              const playerColor = colorScale(playerCountry);
+              const resetFontSize = isMobile ? '11px' : '14px';
+              
+              group.select('.player-name')
+                .style('font-weight', '500')
+                .style('font-size', resetFontSize)
+                .style('opacity', 1)
+                .style('fill', playerColor);
+            }
         
         // Hide underline if not the currently hovered player
         if (hoveredPlayer === null || playerName !== hoveredPlayer.name) {
@@ -864,8 +892,8 @@
       const iconX = Math.cos(legendAngle - Math.PI / 2) * config.radius;
       const iconY = Math.sin(legendAngle - Math.PI / 2) * config.radius;
       
-      // Icon size
-      const iconSize = 14;
+      // Icon size (smaller on mobile)
+      const iconSize = isMobile ? 10 : 14;
       
       // Get computed text color for icon
       let iconColor = '#333';
