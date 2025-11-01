@@ -1022,8 +1022,13 @@
     }
 
     function unhighlightPlayerData(playerIndex) {
+      const player = data[playerIndex];
+      const playerCountry = player?.country_provenance || player?.national_team || 'Unknown';
+      const playerColor = colorScale(playerCountry);
+      
       // Reset country
       nationalTeamLayer.selectAll(`text.country-text[data-player-index="${playerIndex}"]`)
+        .style('fill', playerColor)
         .style('opacity', 0.8)
         .style('font-weight', '600')
         .style('font-size', isMobile ? '10px' : '12px');
@@ -1031,35 +1036,50 @@
       // Reset clubs
       clubsLayer.selectAll(`circle.club-dot[data-player-index="${playerIndex}"]`)
         .attr('r', 5)
+        .style('fill', playerColor)
         .style('opacity', 0.8)
         .style('stroke-width', 1);
       
       // Reset appearances
       appearancesLayer.selectAll(`circle.appearances-circle[data-player-index="${playerIndex}"]`)
+        .style('fill', playerColor)
         .style('opacity', 0.5)
         .style('stroke', 'none')
         .style('stroke-width', 0);
       appearancesLayer.selectAll(`text.appearances-text[data-player-index="${playerIndex}"]`)
+        .style('fill', 'var(--text-color)')
+        .style('opacity', 1)
         .style('font-weight', 'bold')
         .style('font-size', isMobile ? '8px' : '10px');
       
       // Reset assists
       assistsLayer.selectAll(`circle.assists-circle[data-player-index="${playerIndex}"]`)
+        .style('fill', playerColor)
         .style('opacity', 0.5)
         .style('stroke', 'none')
         .style('stroke-width', 0);
       assistsLayer.selectAll(`text.assists-text[data-player-index="${playerIndex}"]`)
+        .style('fill', 'var(--text-color)')
+        .style('opacity', 1)
         .style('font-weight', 'bold')
         .style('font-size', isMobile ? '8px' : '10px');
       
       // Reset goals
       goalsLayer.selectAll(`circle.goals-circle[data-player-index="${playerIndex}"]`)
+        .style('fill', playerColor)
         .style('opacity', 0.6)
         .style('stroke', 'none')
         .style('stroke-width', 0);
       goalsLayer.selectAll(`text.goals-text[data-player-index="${playerIndex}"]`)
+        .style('fill', 'var(--text-color)')
+        .style('opacity', 1)
         .style('font-weight', 'bold')
         .style('font-size', isMobile ? '9px' : '11px');
+      
+      // Reset connection point
+      g.selectAll(`circle.connection-point[data-player-index="${playerIndex}"]`)
+        .style('fill', playerColor)
+        .style('opacity', 0.6);
     }
 
     function showConnections(player, playerIndex) {
@@ -1152,19 +1172,20 @@
             }
           }
           
-          // Reset connections
-          allConnections.forEach(conn => {
-            if (conn.player1 === player.name || conn.player2 === player.name) {
-              conn.path
-                .style('stroke', 'var(--viz-connection-color)')
-                .style('stroke-width', 1)
-                .style('opacity', 0.15);
-            }
-          });
+          // Reset connections (will be done outside loop to avoid duplicates)
           
           // Reset data elements
           unhighlightPlayerData(i);
         });
+        
+        // Reset all connections to normal state
+        allConnections.forEach(conn => {
+          conn.path
+            .style('stroke', 'var(--viz-connection-color)')
+            .style('stroke-width', 1)
+            .style('opacity', 0.15);
+        });
+        
         return;
       }
 
