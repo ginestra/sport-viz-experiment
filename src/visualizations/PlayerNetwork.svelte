@@ -1596,7 +1596,7 @@
     color: var(--text-color);
     font-size: 0.9rem;
     cursor: pointer;
-    font-family: inherit;
+    font-family: monospace;
   }
 
   .filter-group select:hover {
