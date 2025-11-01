@@ -49,6 +49,7 @@
       return {
         ...d,
         career_goals: +d.career_goals || 0,
+        career_assists: +d.career_assists || 0,
         clubs: clubs,
         national_team: d.national_team || d.country_provenance
       };
@@ -197,6 +198,7 @@
     // Define radii for different rings
     const innerRadius = size * 0.08;  // Connection points (centers for connections)
     const goalsRadius = size * 0.18;  // Goals count
+    const assistsRadius = size * 0.23;  // Assists count (between goals and clubs)
     const clubsRadius = size * 0.28;  // Club dots
     const nationalTeamRadius = size * 0.32; // National team names (closer to club dots, uniform distance)
     const playerNameRadius = size * 0.42; // Player names (moved closer to center)
@@ -321,14 +323,16 @@
     });
 
     // Create angles for each player - evenly distribute around circle
+    // Add 1 for the legend slot that will be placed before the first player
     const numPlayers = data.length;
-    const angleStep = (2 * Math.PI) / numPlayers;
+    const totalSlots = numPlayers + 1; // +1 for legend slot
+    const angleStep = (2 * Math.PI) / totalSlots;
 
     // Draw radial lines to slice the circles (pie-like dividers for each player)
     const radialLinesLayer = g.append('g').attr('class', 'radial-lines-layer');
     
-    // Draw a line for each player slice boundary
-    for (let i = 0; i < numPlayers; i++) {
+    // Draw a line for each player slice boundary (including legend slot)
+    for (let i = 0; i <= numPlayers; i++) {
       const angle = i * angleStep;
       const startRadius = innerRadius * 0.5; // Start slightly inside inner radius
       const endRadius = playerNameRadius + 10; // Extend slightly beyond player names
@@ -368,6 +372,17 @@
       .attr('cx', 0)
       .attr('cy', 0)
       .attr('r', goalsRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--text-color)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Assists circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', assistsRadius)
       .style('fill', 'none')
       .style('stroke', 'var(--text-color)')
       .style('stroke-width', 1)
@@ -417,10 +432,10 @@
     data.forEach((player, i) => {
       const connections = findConnections(player, data);
       connections.forEach(conn => {
-        const otherIndex = data.findIndex(p => p.name === conn.player.name);
-        if (otherIndex !== -1 && otherIndex > i) { // Only draw each connection once
-          const angle1 = i * angleStep;
-          const angle2 = otherIndex * angleStep;
+          const otherIndex = data.findIndex(p => p.name === conn.player.name);
+          if (otherIndex !== -1 && otherIndex > i) { // Only draw each connection once
+            const angle1 = (i + 1) * angleStep; // +1 because index 0 is for legends
+            const angle2 = (otherIndex + 1) * angleStep;
           
           const x1 = Math.cos(angle1 - Math.PI / 2) * innerRadius;
           const y1 = Math.sin(angle1 - Math.PI / 2) * innerRadius;
@@ -470,6 +485,9 @@
     // Draw goals count
     const goalsLayer = g.append('g').attr('class', 'goals-layer');
     
+    // Draw assists count
+    const assistsLayer = g.append('g').attr('class', 'assists-layer');
+    
     // Add soccer ball icon at the center
     // Using Font Awesome SVG path directly for better SVG compatibility
     const iconSize = size * 0.12;
@@ -491,7 +509,8 @@
     }
 
     data.forEach((player, i) => {
-      const angle = i * angleStep;
+      // Start from index 1 because index 0 is reserved for legends
+      const angle = (i + 1) * angleStep;
       
       // Connection point (inner radius) - where connections will originate
       const connectionX = Math.cos(angle - Math.PI / 2) * innerRadius;
@@ -503,7 +522,15 @@
       
       // Calculate radial rotation - text should be perpendicular to radius (tangent to circle)
       // Convert angle to degrees and adjust for SVG rotation (0° = horizontal right, clockwise)
-      const radialRotation = (angle * 180 / Math.PI) + 90;
+      let radialRotation = (angle * 180 / Math.PI) + 90;
+      
+      // For names on the right side (12 to 6 o'clock), rotate by 180° for clockwise readability
+      // Right side means x-coordinate is positive (x > 0)
+      // Check if we're on the right side by examining the actual x position
+      if (playerNameX > 0) {
+        radialRotation += 180;
+      }
+      
       // Adjust text anchor based on position for better readability
       const textAnchor = angle > Math.PI / 2 && angle < 3 * Math.PI / 2 ? 'end' : 'start';
 
@@ -586,10 +613,11 @@
             .duration(200)
             .style('opacity', 1);
           tooltip.html(`
-            <strong>${player.name}</strong><br/>
-            National Team: ${player.national_team}<br/>
-            Career Goals: ${player.career_goals}<br/>
-            Clubs: ${player.clubs.map(c => c.name).join(', ')}
+              <strong>${player.name}</strong><br/>
+              National Team: ${player.national_team}<br/>
+              Career Goals: ${player.career_goals}<br/>
+              Career Assists: ${player.career_assists || 0}<br/>
+              Clubs: ${player.clubs.map(c => c.name).join(', ')}
           `)
             .style('left', (event.pageX + 10) + 'px')
             .style('top', (event.pageY - 10) + 'px');
@@ -629,7 +657,29 @@
         .style('fill', 'var(--text-color)')
         .text(player.career_goals);
 
-      // Club dots (second outer ring) - group them directly aligned with the player's radial position
+      // Assists count (between goals and clubs)
+      const assistsX = Math.cos(angle - Math.PI / 2) * assistsRadius;
+      const assistsY = Math.sin(angle - Math.PI / 2) * assistsRadius;
+      
+      assistsLayer.append('circle')
+        .attr('cx', assistsX)
+        .attr('cy', assistsY)
+        .attr('r', Math.max(6, Math.min(16, player.career_assists / 8)))
+        .style('fill', playerColor)
+        .style('opacity', 0.5);
+        
+      assistsLayer.append('text')
+        .attr('x', assistsX)
+        .attr('y', assistsY)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .style('font-size', '10px')
+        .style('font-family', 'monospace')
+        .style('font-weight', 'bold')
+        .style('fill', 'var(--text-color)')
+        .text(player.career_assists || '0');
+
+      // Club dots (third outer ring) - group them directly aligned with the player's radial position
       const numClubs = player.clubs.length;
       if (numClubs > 0) {
         // Position clubs in a tight cluster along the player's radial line
@@ -777,6 +827,90 @@
       });
     }
 
+    // Add circle legends with icons positioned on the circles themselves
+    // Distribute legends evenly around the circle, replacing player positions
+    const legendsLayer = g.append('g').attr('class', 'circle-legends-layer');
+    
+    // Legend configurations: radius, SVG path, viewBox, label
+    const legendConfigs = [
+      { radius: innerRadius, path: 'M0 80C0 53.5 21.5 32 48 32l96 0c26.5 0 48 21.5 48 48l0 16 128 0 0-16c0-26.5 21.5-48 48-48l96 0c26.5 0 48 21.5 48 48l0 96c0 26.5-21.5 48-48 48l-96 0c-26.5 0-48-21.5-48-48l0-16-128 0 0 16c0 7.3-1.7 14.3-4.6 20.5l68.6 91.5 80 0c26.5 0 48 21.5 48 48l0 96c0 26.5-21.5 48-48 48l-96 0c-26.5 0-48-21.5-48-48l0-96c0-7.3 1.7-14.3 4.6-20.5L128 224 48 224c-26.5 0-48-21.5-48-48L0 80z', viewBox: '0 0 512 512', label: 'Connections' },
+      { radius: goalsRadius, path: 'M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6l59.2 0c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z', viewBox: '0 0 512 512', label: 'Goals' },
+      { radius: assistsRadius, path: 'M256.5-32a56 56 0 1 1 0 112 56 56 0 1 1 0-112zM123.6 176c-3.3 0-6.2 2-7.4 5L94.2 235.9c-6.6 16.4-25.2 24.4-41.6 17.8s-24.4-25.2-17.8-41.6l21.9-54.9C67.7 129.9 94.1 112 123.6 112l97.3 0c28.5 0 54.8 15.1 69.1 39.7l32.8 56.3 61.6 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-61.6 0c-22.8 0-43.8-12.1-55.3-31.8l-10-17.1-20.7 70.4 75.4 22.6c27.7 8.3 41.8 39 30.1 65.5L285.7 509c-7.2 16.2-26.1 23.4-42.2 16.2s-23.4-26.1-16.2-42.2l49.2-110.8-95.9-28.8c-32.7-9.8-52-43.7-43.7-76.8l22.7-90.6-35.9 0zm-8 181c13.3 14.9 30.7 26.3 51.2 32.4l4.7 1.4-6.9 19.3c-5.8 16.3-16 30.8-29.3 41.8L52.9 519.8c-13.6 11.2-33.8 9.3-45-4.3s-9.3-33.8 4.3-45l82.4-67.9c4.5-3.7 7.8-8.5 9.8-13.9L115.6 357z', viewBox: '0 0 448 512', label: 'Assists' },
+      { radius: clubsRadius, path: 'M256 0c4.6 0 9.2 1 13.4 2.9L457.8 82.8c22 9.3 38.4 31 38.3 57.2-.5 99.2-41.3 280.7-213.6 363.2-16.7 8-36.1 8-52.8 0-172.4-82.5-213.1-264-213.6-363.2-.1-26.2 16.3-47.9 38.3-57.2L242.7 2.9C246.9 1 251.4 0 256 0z', viewBox: '0 0 512 512', label: 'Clubs' },
+      { radius: nationalTeamRadius, path: 'M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z', viewBox: '0 0 448 512', label: 'Country' },
+      { radius: playerNameRadius, path: 'M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z', viewBox: '0 0 448 512', label: 'Player' }
+    ];
+    
+    // Position legends as a single player slot at index 0 (before Australia)
+    // Calculate the angle for the legend slot (index 0)
+    const legendAngle = 0 * angleStep;
+    
+    // Draw connection point for legend slot (like players have)
+    const legendConnectionX = Math.cos(legendAngle - Math.PI / 2) * innerRadius;
+    const legendConnectionY = Math.sin(legendAngle - Math.PI / 2) * innerRadius;
+    
+    g.append('circle')
+      .attr('cx', legendConnectionX)
+      .attr('cy', legendConnectionY)
+      .attr('r', 3)
+      .style('fill', 'var(--text-color)')
+      .style('opacity', 0.6);
+    
+    // Calculate radial rotation for labels (perpendicular to radius)
+    const radialRotation = (legendAngle * 180 / Math.PI) + 90;
+    
+    legendConfigs.forEach((config) => {
+      // Position icon centered on its circle (like goals, assists, clubs)
+      const iconX = Math.cos(legendAngle - Math.PI / 2) * config.radius;
+      const iconY = Math.sin(legendAngle - Math.PI / 2) * config.radius;
+      
+      // Icon size
+      const iconSize = 14;
+      
+      // Get computed text color for icon
+      let iconColor = '#333';
+      if (typeof window !== 'undefined' && document.documentElement) {
+        iconColor = getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#333';
+      }
+      
+      // Add icon centered on circle (like goals circle)
+      const iconGroup = legendsLayer.append('g')
+        .attr('class', `legend-icon-${config.label.toLowerCase()}`)
+        .attr('transform', `translate(${iconX}, ${iconY})`);
+      
+      // Create icon as SVG path, centered like goals/assists circles
+      const viewBoxMatch = config.viewBox.match(/(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/);
+      const viewBoxWidth = viewBoxMatch ? parseFloat(viewBoxMatch[3]) : 512;
+      const viewBoxHeight = viewBoxMatch ? parseFloat(viewBoxMatch[4]) : 512;
+      const viewBoxCenterX = viewBoxWidth / 2;
+      const viewBoxCenterY = viewBoxHeight / 2;
+      
+      const scale = iconSize / Math.max(viewBoxWidth, viewBoxHeight);
+      
+      const iconPath = iconGroup.append('path')
+        .attr('d', config.path)
+        .attr('transform', `scale(${scale}) translate(${-viewBoxCenterX}, ${-viewBoxCenterY})`)
+        .style('fill', iconColor)
+        .style('opacity', 0.8)
+        .style('cursor', 'pointer');
+      
+      // Add hover handlers for tooltip
+      iconPath
+        .on('mouseenter', function(event) {
+          tooltip.transition()
+            .duration(200)
+            .style('opacity', 1);
+          tooltip.html(config.label)
+            .style('left', (event.pageX + 10) + 'px')
+            .style('top', (event.pageY - 10) + 'px');
+        })
+        .on('mouseleave', function() {
+          tooltip.transition()
+            .duration(200)
+            .style('opacity', 0);
+        });
+    });
+    
     // Add country color legend - position to the right of the visualization
     // Calculate right edge of visualization circle: centerX + playerNameRadius + padding
     const visualizationRightEdge = centerX + playerNameRadius + 20;
