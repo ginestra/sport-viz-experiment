@@ -171,16 +171,7 @@
   }
 
   function createVisualization() {
-    console.log('createVisualization called', { 
-      hasContainer: !!container, 
-      hasData: !!data, 
-      isArray: Array.isArray(data),
-      dataLength: data ? data.length : 0,
-      dataSample: data && data.length > 0 ? data[0] : null
-    });
-    
     if (!container || !data || !Array.isArray(data) || data.length === 0) {
-      console.error('Cannot create visualization: container or data is missing', { container, data });
       return;
     }
 
@@ -211,14 +202,14 @@
 
     const tooltip = createTooltip();
 
-    // Define radii for different rings (adjusted for mobile)
+    // NEW ORDER: Define radii for different rings (from inner to outer: network, player names, country, clubs, assists, goals)
     const radiusMultiplier = isMobile ? 0.9 : 1.0; // Slightly smaller on mobile
-    const innerRadius = size * 0.08 * radiusMultiplier;  // Connection points (centers for connections)
-    const goalsRadius = size * 0.18 * radiusMultiplier;  // Goals count
-    const assistsRadius = size * 0.23 * radiusMultiplier;  // Assists count (between goals and clubs)
-    const clubsRadius = size * 0.28 * radiusMultiplier;  // Club dots
-    const nationalTeamRadius = size * 0.32 * radiusMultiplier; // National team names (closer to club dots, uniform distance)
-    const playerNameRadius = size * 0.42 * radiusMultiplier; // Player names (moved closer to center)
+    const innerRadius = size * 0.08 * radiusMultiplier;  // Connection points (network - stays same)
+    const playerNameRadius = size * 0.12 * radiusMultiplier;  // Player names (second layer) - closer to network circle
+    const nationalTeamRadius = size * 0.32 * radiusMultiplier;  // National team names (third layer) - increased for more distance from player names
+    const clubsRadius = size * 0.39 * radiusMultiplier;  // Club dots (fourth layer) - adjusted to maintain spacing
+    const assistsRadius = size * 0.46 * radiusMultiplier;  // Assists count (fifth layer) - adjusted to maintain spacing
+    const goalsRadius = size * 0.53 * radiusMultiplier;  // Goals count (outermost layer) - adjusted to maintain spacing
 
     // Create color scale by country - filter out undefined/null values
     let countryValues = [];
@@ -230,36 +221,24 @@
         })
         .filter(c => c !== null && c !== undefined);
     } catch (e) {
-      console.error('Error extracting countries:', e, data);
       countryValues = [];
     }
     
-    // Use Array.from instead of spread to avoid transpilation issues
+    // Get unique countries
     let countries = [];
     try {
       if (Array.isArray(countryValues) && countryValues.length > 0) {
         const countrySet = new Set(countryValues);
         countries = Array.from(countrySet);
-      } else {
-        console.warn('countryValues is not a valid array:', countryValues);
-        countries = [];
       }
     } catch (e) {
-      console.error('Error creating country set:', e, countryValues);
-      countries = [];
-    }
-    
-    // Ensure countries is always an array
-    if (!Array.isArray(countries)) {
-      console.error('countries is not an array:', countries);
-      countries = [];
+      // If error, countries stays empty array
     }
     
     if (countries.length === 0) {
-      console.error('No countries found in data', { data, countryValues, countries });
       return;
     }
-    
+
     // Use a safe color scheme - schemeCategory20 was deprecated, use schemeSet3 or custom palette
     let colorScheme;
     try {
@@ -284,29 +263,24 @@
     }
     
     if (!Array.isArray(colorScheme) || colorScheme.length === 0) {
-      console.error('Invalid color scheme:', colorScheme);
       colorScheme = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd'];
     }
-    
+
     // Ensure countries array is valid before passing to scaleOrdinal
     const validCountries = Array.isArray(countries) ? countries : [];
     if (validCountries.length === 0) {
-      console.error('Cannot create color scale: no valid countries');
       return;
     }
-    
-    // Create color scale - handle D3 v7 API changes
+
+    // Create color scale
     let colorScale;
     try {
       if (typeof d3.scaleOrdinal === 'function') {
-        // Verify validCountries is iterable before passing to domain
-        console.log('Creating scaleOrdinal with', { validCountries, colorSchemeLength: colorScheme.length });
         colorScale = d3.scaleOrdinal()
           .range(colorScheme)
           .domain(validCountries);
       } else {
         // Fallback: create a simple function that cycles through colors
-        console.warn('d3.scaleOrdinal not available, using fallback');
         const colorMap = new Map();
         validCountries.forEach((country, i) => {
           colorMap.set(country, colorScheme[i % colorScheme.length]);
@@ -314,7 +288,6 @@
         colorScale = (country) => colorMap.get(country) || colorScheme[0];
       }
     } catch (e) {
-      console.error('Error creating color scale:', e, { validCountries, colorScheme });
       // Fallback: create a simple function
       const colorMap = new Map();
       validCountries.forEach((country, i) => {
@@ -322,8 +295,6 @@
       });
       colorScale = (country) => colorMap.get(country) || colorScheme[0];
     }
-    
-    console.log('Color scale created', { validCountries, colorScale: typeof colorScale });
 
     // Sort players: first by country (alphabetically), then alphabetically by name within each country
     data.sort((a, b) => {
@@ -340,7 +311,6 @@
     });
 
     // Create angles for each player - evenly distribute around circle
-    // Add 1 for the legend slot that will be placed before the first player
     const numPlayers = data.length;
     const totalSlots = numPlayers + 1; // +1 for legend slot
     const angleStep = (2 * Math.PI) / totalSlots;
@@ -352,7 +322,7 @@
     for (let i = 0; i <= numPlayers; i++) {
       const angle = i * angleStep;
       const startRadius = innerRadius * 0.5; // Start slightly inside inner radius
-      const endRadius = playerNameRadius + 10; // Extend slightly beyond player names
+      const endRadius = goalsRadius + 10; // Extend slightly beyond goals (outermost)
       
       const x1 = Math.cos(angle - Math.PI / 2) * startRadius;
       const y1 = Math.sin(angle - Math.PI / 2) * startRadius;
@@ -370,10 +340,10 @@
         .style('opacity', 0.15);
     }
 
-    // Draw circle outlines for each ring section
+    // Draw circle outlines for each ring section (NEW ORDER)
     const circlesLayer = g.append('g').attr('class', 'circles-layer');
     
-    // Inner circle (connection points)
+    // Inner circle (connection points / network)
     circlesLayer.append('circle')
       .attr('cx', 0)
       .attr('cy', 0)
@@ -384,33 +354,11 @@
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
     
-    // Goals circle
+    // Player names circle
     circlesLayer.append('circle')
       .attr('cx', 0)
       .attr('cy', 0)
-      .attr('r', goalsRadius)
-      .style('fill', 'none')
-      .style('stroke', 'var(--viz-circle-stroke)')
-      .style('stroke-width', 1)
-      .style('stroke-dasharray', '4,4')
-      .style('opacity', 0.2);
-    
-    // Assists circle
-    circlesLayer.append('circle')
-      .attr('cx', 0)
-      .attr('cy', 0)
-      .attr('r', assistsRadius)
-      .style('fill', 'none')
-      .style('stroke', 'var(--viz-circle-stroke)')
-      .style('stroke-width', 1)
-      .style('stroke-dasharray', '4,4')
-      .style('opacity', 0.2);
-    
-    // Clubs circle
-    circlesLayer.append('circle')
-      .attr('cx', 0)
-      .attr('cy', 0)
-      .attr('r', clubsRadius)
+      .attr('r', playerNameRadius)
       .style('fill', 'none')
       .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
@@ -428,11 +376,33 @@
       .style('stroke-dasharray', '4,4')
       .style('opacity', 0.2);
     
-    // Player names circle
+    // Clubs circle
     circlesLayer.append('circle')
       .attr('cx', 0)
       .attr('cy', 0)
-      .attr('r', playerNameRadius)
+      .attr('r', clubsRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--viz-circle-stroke)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Assists circle
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', assistsRadius)
+      .style('fill', 'none')
+      .style('stroke', 'var(--viz-circle-stroke)')
+      .style('stroke-width', 1)
+      .style('stroke-dasharray', '4,4')
+      .style('opacity', 0.2);
+    
+    // Goals circle (outermost)
+    circlesLayer.append('circle')
+      .attr('cx', 0)
+      .attr('cy', 0)
+      .attr('r', goalsRadius)
       .style('fill', 'none')
       .style('stroke', 'var(--viz-circle-stroke)')
       .style('stroke-width', 1)
@@ -490,29 +460,19 @@
       });
     });
     
-    // Draw player names (outermost)
+    // Create layers for each data type
     const namesLayer = g.append('g').attr('class', 'names-layer');
-    
-    // Draw national team names
     const nationalTeamLayer = g.append('g').attr('class', 'national-team-layer');
-    
-    // Draw club dots
     const clubsLayer = g.append('g').attr('class', 'clubs-layer');
-    
-    // Draw goals count
+    const assistsLayer = g.append('g').attr('class', 'assists-layer');
     const goalsLayer = g.append('g').attr('class', 'goals-layer');
     
-    // Draw assists count
-    const assistsLayer = g.append('g').attr('class', 'assists-layer');
-    
     // Add soccer ball icon at the center
-    // Using Font Awesome SVG path directly for better SVG compatibility
     const iconSize = size * 0.12;
     const iconGroup = g.append('g')
       .attr('class', 'center-icon');
     
-    // Font Awesome soccer-ball SVG path (actual soccer/football ball with pentagon/hexagon pattern)
-    // Path from @fortawesome/fontawesome-free/svgs/solid/soccer-ball.svg
+    // Font Awesome soccer-ball SVG path
     const soccerBallPath = iconGroup.append('path')
       .attr('d', 'M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6l59.2 0c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z')
       .attr('transform', `scale(${iconSize / 512}) translate(-256, -256)`)
@@ -527,25 +487,22 @@
       const connectionX = Math.cos(angle - Math.PI / 2) * innerRadius;
       const connectionY = Math.sin(angle - Math.PI / 2) * innerRadius;
       
-      // Player name position (outermost)
+      // Player name position (second layer, after network)
       const playerNameX = Math.cos(angle - Math.PI / 2) * playerNameRadius;
       const playerNameY = Math.sin(angle - Math.PI / 2) * playerNameRadius;
       
-      // Calculate radial rotation - text should be perpendicular to radius (tangent to circle)
-      // Convert angle to degrees and adjust for SVG rotation (0° = horizontal right, clockwise)
+      // Calculate radial rotation
       let radialRotation = (angle * 180 / Math.PI) + 90;
       
+      // Determine if on right side (12 to 6 o'clock) or left side (6 to 12 o'clock)
+      const isRightSide = playerNameX > 0;
+      
       // For names on the right side (12 to 6 o'clock), rotate by 180° for clockwise readability
-      // Right side means x-coordinate is positive (x > 0)
-      // Check if we're on the right side by examining the actual x position
-      if (playerNameX > 0) {
+      if (isRightSide) {
         radialRotation += 180;
       }
-      
-      // Adjust text anchor based on position for better readability
-      const textAnchor = angle > Math.PI / 2 && angle < 3 * Math.PI / 2 ? 'end' : 'start';
 
-      // Get color for this player's country - fallback to default if missing
+      // Get color for this player's country
       const playerCountry = player.country_provenance || player.national_team || 'Unknown';
       const playerColor = colorScale(playerCountry);
 
@@ -557,28 +514,30 @@
         .style('fill', playerColor)
         .style('opacity', 0.6);
 
-      // Player name (outermost circle) - rotated radially
-      // Use a group to add background and ensure consistent positioning
+      // Player name (second layer) - rotated radially
+      // Right side (12-6): 'start' anchor (points toward center after 180° rotation)
+      // Left side (6-12): 'end' anchor (points toward center)
       const nameGroup = namesLayer.append('g')
         .attr('class', 'player-name-group')
         .attr('data-player-name', player.name)
         .attr('transform', `translate(${playerNameX}, ${playerNameY}) rotate(${radialRotation})`)
         .style('cursor', 'pointer');
       
-      // Determine display name based on screen size
       const displayName = isMobile ? getLastName(player.name) : player.name;
       const fontSize = isMobile ? '11px' : '14px';
       
-      // Add text first to measure it (temporarily hidden)
+      // Choose anchor based on side: right side uses 'start', left side uses 'end'
+      const textAnchor = isRightSide ? 'start' : 'end';
+      
+      // Measure text for underline
       const tempText = nameGroup.append('text')
-        .attr('text-anchor', 'middle')
+        .attr('text-anchor', textAnchor)
         .attr('dominant-baseline', 'middle')
         .style('font-size', fontSize)
         .style('font-weight', '500')
         .style('visibility', 'hidden')
         .text(displayName);
       
-      // Measure text and create background
       let textWidth = 0;
       let textHeight = 0;
       tempText.each(function() {
@@ -587,43 +546,85 @@
         textHeight = bbox.height;
       });
       
-      // Remove temp text
       tempText.remove();
       
-      // Add underline line element (hidden by default)
-      // Position underline below the text baseline
+      // Add an invisible hit area rectangle that covers the text
+      // This prevents flickering when font size changes
+      // Position based on anchor: right side starts at 0, left side ends at 0
+      const hitAreaPadding = 5; // Extra padding around text
+      const hitAreaRect = nameGroup.append('rect')
+        .attr('x', isRightSide ? -hitAreaPadding : -textWidth - hitAreaPadding)
+        .attr('y', -textHeight / 2 - hitAreaPadding)
+        .attr('width', textWidth + (hitAreaPadding * 2))
+        .attr('height', textHeight + (hitAreaPadding * 2))
+        .style('fill', 'transparent')
+        .style('pointer-events', 'all') // Make it catch mouse events
+        .style('cursor', 'pointer');
+      
+      // Add text - anchor depends on side
+      const nameText = nameGroup.append('text')
+        .attr('text-anchor', textAnchor)
+        .attr('dominant-baseline', 'middle')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('class', 'player-name')
+        .attr('data-player-name', player.name) // Add data attribute for easier selection
+        .attr('data-player-index', i) // Store index for identification
+        .style('font-size', fontSize)
+        .attr('font-size', fontSize) // Set as attribute too
+        .style('font-family', 'monospace')
+        .style('fill', playerColor)
+        .style('font-weight', '500')
+        .style('pointer-events', 'none'); // Text doesn't need pointer events, hit area handles it
+      
+      nameText.text(displayName);
+      
+      // Add underline - positioned based on anchor
+      // Right side: starts at 0, extends to textWidth
+      // Left side: ends at 0, extends backward to -textWidth
       const underline = nameGroup.append('line')
-        .attr('x1', -textWidth / 2)
-        .attr('x2', textWidth / 2)
+        .attr('x1', isRightSide ? 0 : -textWidth)
+        .attr('x2', isRightSide ? textWidth : 0)
         .attr('y1', textHeight / 2 + 3)
         .attr('y2', textHeight / 2 + 3)
         .style('stroke', playerColor)
         .style('stroke-width', 2)
         .style('opacity', 0)
-        .style('transition', 'opacity 0.2s ease');
+        .style('transition', 'opacity 0.2s ease')
+        .style('pointer-events', 'none'); // Underline should not block mouse events
       
-      // Add text with consistent middle anchor for uniform distance
-      const nameText = nameGroup.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .attr('class', 'player-name')
-        .style('font-size', fontSize)
-        .style('font-family', 'monospace')
-        .style('fill', playerColor)
-        .style('font-weight', '500')
-        .text(displayName);
+      // Store references to data elements for highlighting
+      nameGroup.attr('data-player-index', i);
       
-      // Add hover handlers to the group
+      // Make the entire group interactive
+      nameGroup
+        .style('pointer-events', 'all')
+        .style('cursor', 'pointer');
+      
+      // Hover handlers - mark as hovered with data attribute and update size
+      // Attach to both group and text to ensure we catch all hover events
       nameGroup
         .on('mouseenter', function(event) {
           hoveredPlayer = player;
-          showConnections(player, i);
-          const hoverFontSize = isMobile ? '13px' : '16px';
+          
+          // Mark this group as the currently hovered player
+          nameGroup.attr('data-is-hovered', 'true');
+          nameText.attr('data-is-hovered', 'true');
+          
+          // Set hovered player's font size (slightly bigger for better visibility)
+          const hoverFontSize = isMobile ? '14px' : '18px';
           nameText
             .style('font-weight', 'bold')
             .style('font-size', hoverFontSize)
-            .style('fill', d3.rgb(playerColor).darker(0.3).toString()); // Darken text slightly for contrast
+            .attr('font-size', hoverFontSize)
+            .style('fill', d3.rgb(playerColor).darker(0.3).toString());
           underline.style('opacity', 1);
+          
+          // Call showConnections first - it will NOT modify this player because of data-is-hovered attribute
+          showConnections(player, i);
+          
+          // Highlight ONLY this player's data elements (not connected players')
+          highlightPlayerData(i, playerColor);
           
           tooltip.transition()
             .duration(200)
@@ -640,78 +641,58 @@
         })
         .on('mouseleave', function() {
           hoveredPlayer = null;
+          
+          // Remove hovered marker
+          nameGroup.attr('data-is-hovered', null);
+          nameText.attr('data-is-hovered', null);
+          
           hideConnections();
-              const normalFontSize = isMobile ? '11px' : '14px';
-              nameText
-                .style('font-weight', '500')
-                .style('font-size', normalFontSize)
-                .style('fill', playerColor); // Restore original color
+          const normalFontSize = isMobile ? '11px' : '14px';
+          nameText
+            .style('font-weight', '500')
+            .style('font-size', normalFontSize)
+            .attr('font-size', normalFontSize)
+            .style('fill', playerColor);
           underline.style('opacity', 0);
+          
+          // Unhighlight this player's data elements
+          unhighlightPlayerData(i);
           tooltip.transition()
             .duration(200)
             .style('opacity', 0);
         });
 
-      // Goals count (first outer ring)
-      const goalsX = Math.cos(angle - Math.PI / 2) * goalsRadius;
-      const goalsY = Math.sin(angle - Math.PI / 2) * goalsRadius;
+      // National team code (third layer)
+      const natTeamX = Math.cos(angle - Math.PI / 2) * nationalTeamRadius;
+      const natTeamY = Math.sin(angle - Math.PI / 2) * nationalTeamRadius;
+      const countryCode = getCountryCode(player.national_team).toUpperCase();
       
-      goalsLayer.append('circle')
-        .attr('cx', goalsX)
-        .attr('cy', goalsY)
-        .attr('r', Math.max(8, Math.min(20, player.career_goals / 10)))
-        .style('fill', playerColor)
-        .style('opacity', 0.6);
-        
-      const goalsFontSize = isMobile ? '9px' : '11px';
-      goalsLayer.append('text')
-        .attr('x', goalsX)
-        .attr('y', goalsY)
+      const countryFontSize = isMobile ? '10px' : '12px';
+      nationalTeamLayer.append('text')
+        .attr('x', natTeamX)
+        .attr('y', natTeamY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .style('font-size', goalsFontSize)
+        .attr('transform', `rotate(${radialRotation}, ${natTeamX}, ${natTeamY})`)
+        .attr('data-player-index', i)
+        .attr('class', 'country-text')
+        .style('font-size', countryFontSize)
         .style('font-family', 'monospace')
-        .style('font-weight', 'bold')
-        .style('fill', 'var(--text-color)')
-        .text(player.career_goals);
-
-      // Assists count (between goals and clubs)
-      const assistsX = Math.cos(angle - Math.PI / 2) * assistsRadius;
-      const assistsY = Math.sin(angle - Math.PI / 2) * assistsRadius;
-      
-      assistsLayer.append('circle')
-        .attr('cx', assistsX)
-        .attr('cy', assistsY)
-        .attr('r', Math.max(6, Math.min(16, player.career_assists / 8)))
         .style('fill', playerColor)
-        .style('opacity', 0.5);
-        
-      const assistsFontSize = isMobile ? '8px' : '10px';
-      assistsLayer.append('text')
-        .attr('x', assistsX)
-        .attr('y', assistsY)
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
-        .style('font-size', assistsFontSize)
-        .style('font-family', 'monospace')
-        .style('font-weight', 'bold')
-        .style('fill', 'var(--text-color)')
-        .text(player.career_assists || '0');
+        .style('opacity', 0.8)
+        .style('font-weight', '600')
+        .text(countryCode);
 
-      // Club dots (third outer ring) - group them directly aligned with the player's radial position
+      // Club dots (fourth layer)
       const numClubs = player.clubs.length;
       if (numClubs > 0) {
-        // Position clubs in a tight cluster along the player's radial line
-        // For multiple clubs, offset them perpendicular to the radial line (tangent direction)
-        const perpendicularAngle = angle + Math.PI / 2; // 90 degrees from radial
-        const offsetPerClub = 8; // pixels of offset per club
+        const perpendicularAngle = angle + Math.PI / 2;
+        const offsetPerClub = 8;
         
         player.clubs.forEach((club, clubIndex) => {
-          // Center position on the radial line, then offset perpendicular for multiple clubs
           let clubX = Math.cos(angle - Math.PI / 2) * clubsRadius;
           let clubY = Math.sin(angle - Math.PI / 2) * clubsRadius;
           
-          // If multiple clubs, offset them perpendicular to the radial line
           if (numClubs > 1) {
             const perpendicularOffset = (clubIndex - (numClubs - 1) / 2) * offsetPerClub;
             clubX += Math.cos(perpendicularAngle) * perpendicularOffset;
@@ -722,6 +703,8 @@
             .attr('cx', clubX)
             .attr('cy', clubY)
             .attr('r', 5)
+            .attr('data-player-index', i)
+            .attr('class', 'club-dot')
             .style('fill', playerColor)
             .style('opacity', 0.8)
             .style('stroke', 'var(--bg-primary)')
@@ -758,53 +741,172 @@
         });
       }
 
-      // National team code - rotated radially with consistent middle anchor
-      const natTeamX = Math.cos(angle - Math.PI / 2) * nationalTeamRadius;
-      const natTeamY = Math.sin(angle - Math.PI / 2) * nationalTeamRadius;
-      const countryCode = getCountryCode(player.national_team).toUpperCase();
+      // Assists count (fifth layer)
+      const assistsX = Math.cos(angle - Math.PI / 2) * assistsRadius;
+      const assistsY = Math.sin(angle - Math.PI / 2) * assistsRadius;
       
-      const countryFontSize = isMobile ? '10px' : '12px';
-      nationalTeamLayer.append('text')
-        .attr('x', natTeamX)
-        .attr('y', natTeamY)
+      const assistsCircle = assistsLayer.append('circle')
+        .attr('cx', assistsX)
+        .attr('cy', assistsY)
+        .attr('r', Math.max(6, Math.min(16, player.career_assists / 8)))
+        .attr('data-player-index', i)
+        .attr('class', 'assists-circle')
+        .style('fill', playerColor)
+        .style('opacity', 0.5);
+        
+      const assistsFontSize = isMobile ? '8px' : '10px';
+      assistsLayer.append('text')
+        .attr('x', assistsX)
+        .attr('y', assistsY)
         .attr('text-anchor', 'middle')
         .attr('dominant-baseline', 'middle')
-        .attr('transform', `rotate(${radialRotation}, ${natTeamX}, ${natTeamY})`)
-        .style('font-size', countryFontSize)
+        .attr('data-player-index', i)
+        .attr('class', 'assists-text')
+        .style('font-size', assistsFontSize)
         .style('font-family', 'monospace')
+        .style('font-weight', 'bold')
+        .style('fill', 'var(--text-color)')
+        .text(player.career_assists || '0');
+
+      // Goals count (outermost layer)
+      const goalsX = Math.cos(angle - Math.PI / 2) * goalsRadius;
+      const goalsY = Math.sin(angle - Math.PI / 2) * goalsRadius;
+      
+      const goalsCircle = goalsLayer.append('circle')
+        .attr('cx', goalsX)
+        .attr('cy', goalsY)
+        .attr('r', Math.max(8, Math.min(20, player.career_goals / 10)))
+        .attr('data-player-index', i)
+        .attr('class', 'goals-circle')
         .style('fill', playerColor)
+        .style('opacity', 0.6);
+        
+      const goalsFontSize = isMobile ? '9px' : '11px';
+      goalsLayer.append('text')
+        .attr('x', goalsX)
+        .attr('y', goalsY)
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .attr('data-player-index', i)
+        .attr('class', 'goals-text')
+        .style('font-size', goalsFontSize)
+        .style('font-family', 'monospace')
+        .style('font-weight', 'bold')
+        .style('fill', 'var(--text-color)')
+        .text(player.career_goals);
+    });
+
+    function highlightPlayerData(playerIndex, playerColor) {
+      // Highlight country
+      nationalTeamLayer.selectAll(`text.country-text[data-player-index="${playerIndex}"]`)
+        .style('opacity', 1)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '12px' : '14px');
+      
+      // Highlight clubs
+      clubsLayer.selectAll(`circle.club-dot[data-player-index="${playerIndex}"]`)
+        .attr('r', 7)
+        .style('opacity', 1)
+        .style('stroke-width', 2);
+      
+      // Highlight assists
+      assistsLayer.selectAll(`circle.assists-circle[data-player-index="${playerIndex}"]`)
+        .style('opacity', 0.8)
+        .style('stroke', playerColor)
+        .style('stroke-width', 2);
+      assistsLayer.selectAll(`text.assists-text[data-player-index="${playerIndex}"]`)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '10px' : '12px');
+      
+      // Highlight goals
+      goalsLayer.selectAll(`circle.goals-circle[data-player-index="${playerIndex}"]`)
+        .style('opacity', 0.9)
+        .style('stroke', playerColor)
+        .style('stroke-width', 2);
+      goalsLayer.selectAll(`text.goals-text[data-player-index="${playerIndex}"]`)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '11px' : '13px');
+    }
+
+    function unhighlightPlayerData(playerIndex) {
+      // Reset country
+      nationalTeamLayer.selectAll(`text.country-text[data-player-index="${playerIndex}"]`)
         .style('opacity', 0.8)
         .style('font-weight', '600')
-        .text(countryCode);
-    });
+        .style('font-size', isMobile ? '10px' : '12px');
+      
+      // Reset clubs
+      clubsLayer.selectAll(`circle.club-dot[data-player-index="${playerIndex}"]`)
+        .attr('r', 5)
+        .style('opacity', 0.8)
+        .style('stroke-width', 1);
+      
+      // Reset assists
+      assistsLayer.selectAll(`circle.assists-circle[data-player-index="${playerIndex}"]`)
+        .style('opacity', 0.5)
+        .style('stroke', 'none')
+        .style('stroke-width', 0);
+      assistsLayer.selectAll(`text.assists-text[data-player-index="${playerIndex}"]`)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '8px' : '10px');
+      
+      // Reset goals
+      goalsLayer.selectAll(`circle.goals-circle[data-player-index="${playerIndex}"]`)
+        .style('opacity', 0.6)
+        .style('stroke', 'none')
+        .style('stroke-width', 0);
+      goalsLayer.selectAll(`text.goals-text[data-player-index="${playerIndex}"]`)
+        .style('font-weight', 'bold')
+        .style('font-size', isMobile ? '9px' : '11px');
+    }
 
     function showConnections(player, playerIndex) {
       const connections = findConnections(player, data);
       const playerColor = colorScale(player.country_provenance || player.national_team || 'Unknown');
       
-      // Highlight connected player names
+      // Highlight connected player names (smaller than hovered player)
       connections.forEach(conn => {
+        // Skip if this is the hovered player itself
+        if (conn.player.name === player.name) {
+          return;
+        }
+        
+        const connectedIndex = data.findIndex(p => p.name === conn.player.name);
+        if (connectedIndex === -1) {
+          return;
+        }
+        
+        const connPlayerColor = colorScale(conn.player.country_provenance || conn.player.national_team || 'Unknown');
         const connectedNameGroup = namesLayer.select(`[data-player-name="${conn.player.name}"]`);
+        
+        // Skip if this is the hovered player (check data attribute)
+        if (connectedNameGroup.attr('data-is-hovered') === 'true') {
+          return;
+        }
+        
         if (!connectedNameGroup.empty()) {
-            const connectedNameText = connectedNameGroup.select('.player-name');
-            if (!connectedNameText.empty()) {
-              const connPlayerColor = colorScale(conn.player.country_provenance || conn.player.national_team || 'Unknown');
-              const connectedFontSize = isMobile ? '13px' : '16px';
-              connectedNameText
-                .style('font-weight', 'bold')
-                .style('font-size', connectedFontSize)
-                .style('opacity', 1)
-                .style('fill', d3.rgb(connPlayerColor).darker(0.2).toString());
+          const connectedNameText = connectedNameGroup.select('.player-name');
+          if (!connectedNameText.empty()) {
+            // Slightly bigger font for connected players (but smaller than hovered)
+            const connectedFontSize = isMobile ? '12px' : '15px';
+            connectedNameText
+              .style('font-weight', 'bold')
+              .style('font-size', connectedFontSize)
+              .attr('font-size', connectedFontSize)
+              .style('opacity', 1)
+              .style('fill', d3.rgb(connPlayerColor).darker(0.2).toString());
           }
-          // Show underline for connected players
+          
           const connectedUnderline = connectedNameGroup.select('line');
           if (!connectedUnderline.empty()) {
             connectedUnderline.style('opacity', 0.7);
           }
         }
+        
+        // DO NOT highlight connected player's data elements - only highlight the hovered player's stats
       });
       
-      // Highlight connections for this player (make them thicker and colored)
+      // Highlight connections for this player
       allConnections.forEach(conn => {
         if (conn.player1 === player.name || conn.player2 === player.name) {
           conn.path
@@ -824,50 +926,60 @@
           .style('opacity', 0.15);
       });
       
-      // Remove highlighting from all player names
+      // Remove highlighting from all player names (but NOT the currently hovered player)
       namesLayer.selectAll('.player-name-group').each(function() {
         const group = d3.select(this);
+        
+        // Skip if this is marked as hovered
+        if (group.attr('data-is-hovered') === 'true') {
+          return;
+        }
+        
         const playerName = group.attr('data-player-name');
         const playerData = data.find(p => p.name === playerName);
         
-            if (playerData) {
-              const playerCountry = playerData.country_provenance || playerData.national_team || 'Unknown';
-              const playerColor = colorScale(playerCountry);
-              const resetFontSize = isMobile ? '11px' : '14px';
-              
-              group.select('.player-name')
-                .style('font-weight', '500')
-                .style('font-size', resetFontSize)
-                .style('opacity', 1)
-                .style('fill', playerColor);
-            }
-        
-        // Hide underline if not the currently hovered player
-        if (hoveredPlayer === null || playerName !== hoveredPlayer.name) {
-          group.select('line').style('opacity', 0);
+        if (playerData) {
+          const playerCountry = playerData.country_provenance || playerData.national_team || 'Unknown';
+          const playerColor = colorScale(playerCountry);
+          const resetFontSize = isMobile ? '11px' : '14px';
+          
+          const nameTextEl = group.select('.player-name');
+          nameTextEl
+            .style('font-weight', '500')
+            .style('font-size', resetFontSize)
+            .attr('font-size', resetFontSize)
+            .style('opacity', 1)
+            .style('fill', playerColor);
         }
+        
+        group.select('line').style('opacity', 0);
+      });
+      
+      // Reset all data highlights (but NOT the currently hovered player)
+      data.forEach((player, i) => {
+        if (hoveredPlayer && player.name === hoveredPlayer.name) {
+          return; // Skip the hovered player
+        }
+        unhighlightPlayerData(i);
       });
     }
 
-    // Add circle legends with icons positioned on the circles themselves
-    // Distribute legends evenly around the circle, replacing player positions
+    // Add circle legends with icons (NEW ORDER)
     const legendsLayer = g.append('g').attr('class', 'circle-legends-layer');
     
-    // Legend configurations: radius, SVG path, viewBox, label
+    // Legend configurations in new order
     const legendConfigs = [
       { radius: innerRadius, path: 'M0 80C0 53.5 21.5 32 48 32l96 0c26.5 0 48 21.5 48 48l0 16 128 0 0-16c0-26.5 21.5-48 48-48l96 0c26.5 0 48 21.5 48 48l0 96c0 26.5-21.5 48-48 48l-96 0c-26.5 0-48-21.5-48-48l0-16-128 0 0 16c0 7.3-1.7 14.3-4.6 20.5l68.6 91.5 80 0c26.5 0 48 21.5 48 48l0 96c0 26.5-21.5 48-48 48l-96 0c-26.5 0-48-21.5-48-48l0-96c0-7.3 1.7-14.3 4.6-20.5L128 224 48 224c-26.5 0-48-21.5-48-48L0 80z', viewBox: '0 0 512 512', label: 'Connections' },
-      { radius: goalsRadius, path: 'M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6l59.2 0c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z', viewBox: '0 0 512 512', label: 'Goals' },
-      { radius: assistsRadius, path: 'M256.5-32a56 56 0 1 1 0 112 56 56 0 1 1 0-112zM123.6 176c-3.3 0-6.2 2-7.4 5L94.2 235.9c-6.6 16.4-25.2 24.4-41.6 17.8s-24.4-25.2-17.8-41.6l21.9-54.9C67.7 129.9 94.1 112 123.6 112l97.3 0c28.5 0 54.8 15.1 69.1 39.7l32.8 56.3 61.6 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-61.6 0c-22.8 0-43.8-12.1-55.3-31.8l-10-17.1-20.7 70.4 75.4 22.6c27.7 8.3 41.8 39 30.1 65.5L285.7 509c-7.2 16.2-26.1 23.4-42.2 16.2s-23.4-26.1-16.2-42.2l49.2-110.8-95.9-28.8c-32.7-9.8-52-43.7-43.7-76.8l22.7-90.6-35.9 0zm-8 181c13.3 14.9 30.7 26.3 51.2 32.4l4.7 1.4-6.9 19.3c-5.8 16.3-16 30.8-29.3 41.8L52.9 519.8c-13.6 11.2-33.8 9.3-45-4.3s-9.3-33.8 4.3-45l82.4-67.9c4.5-3.7 7.8-8.5 9.8-13.9L115.6 357z', viewBox: '0 0 448 512', label: 'Assists' },
-      { radius: clubsRadius, path: 'M256 0c4.6 0 9.2 1 13.4 2.9L457.8 82.8c22 9.3 38.4 31 38.3 57.2-.5 99.2-41.3 280.7-213.6 363.2-16.7 8-36.1 8-52.8 0-172.4-82.5-213.1-264-213.6-363.2-.1-26.2 16.3-47.9 38.3-57.2L242.7 2.9C246.9 1 251.4 0 256 0z', viewBox: '0 0 512 512', label: 'Clubs' },
+      { radius: playerNameRadius, path: 'M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z', viewBox: '0 0 448 512', label: 'Player' },
       { radius: nationalTeamRadius, path: 'M64 32C64 14.3 49.7 0 32 0S0 14.3 0 32L0 480c0 17.7 14.3 32 32 32s32-14.3 32-32l0-121.6 62.7-18.8c41.9-12.6 87.1-8.7 126.2 10.9 42.7 21.4 92.5 24 137.2 7.2l37.1-13.9c12.5-4.7 20.8-16.6 20.8-30l0-247.7c0-23-24.2-38-44.8-27.7l-11.8 5.9c-44.9 22.5-97.8 22.5-142.8 0-36.4-18.2-78.3-21.8-117.2-10.1L64 54.4 64 32z', viewBox: '0 0 448 512', label: 'Country' },
-      { radius: playerNameRadius, path: 'M224 248a120 120 0 1 0 0-240 120 120 0 1 0 0 240zm-29.7 56C95.8 304 16 383.8 16 482.3 16 498.7 29.3 512 45.7 512l356.6 0c16.4 0 29.7-13.3 29.7-29.7 0-98.5-79.8-178.3-178.3-178.3l-59.4 0z', viewBox: '0 0 448 512', label: 'Player' }
+      { radius: clubsRadius, path: 'M256 0c4.6 0 9.2 1 13.4 2.9L457.8 82.8c22 9.3 38.4 31 38.3 57.2-.5 99.2-41.3 280.7-213.6 363.2-16.7 8-36.1 8-52.8 0-172.4-82.5-213.1-264-213.6-363.2-.1-26.2 16.3-47.9 38.3-57.2L242.7 2.9C246.9 1 251.4 0 256 0z', viewBox: '0 0 512 512', label: 'Clubs' },
+      { radius: assistsRadius, path: 'M256.5-32a56 56 0 1 1 0 112 56 56 0 1 1 0-112zM123.6 176c-3.3 0-6.2 2-7.4 5L94.2 235.9c-6.6 16.4-25.2 24.4-41.6 17.8s-24.4-25.2-17.8-41.6l21.9-54.9C67.7 129.9 94.1 112 123.6 112l97.3 0c28.5 0 54.8 15.1 69.1 39.7l32.8 56.3 61.6 0c17.7 0 32 14.3 32 32s-14.3 32-32 32l-61.6 0c-22.8 0-43.8-12.1-55.3-31.8l-10-17.1-20.7 70.4 75.4 22.6c27.7 8.3 41.8 39 30.1 65.5L285.7 509c-7.2 16.2-26.1 23.4-42.2 16.2s-23.4-26.1-16.2-42.2l49.2-110.8-95.9-28.8c-32.7-9.8-52-43.7-43.7-76.8l22.7-90.6-35.9 0zm-8 181c13.3 14.9 30.7 26.3 51.2 32.4l4.7 1.4-6.9 19.3c-5.8 16.3-16 30.8-29.3 41.8L52.9 519.8c-13.6 11.2-33.8 9.3-45-4.3s-9.3-33.8 4.3-45l82.4-67.9c4.5-3.7 7.8-8.5 9.8-13.9L115.6 357z', viewBox: '0 0 448 512', label: 'Assists' },
+      { radius: goalsRadius, path: 'M417.3 360.1l-71.6-4.8c-5.2-.3-10.3 1.1-14.5 4.2s-7.2 7.4-8.4 12.5l-17.6 69.6C289.5 445.8 273 448 256 448s-33.5-2.2-49.2-6.4L189.2 372c-1.3-5-4.3-9.4-8.4-12.5s-9.3-4.5-14.5-4.2l-71.6 4.8c-17.6-27.2-28.5-59.2-30.4-93.6L125 228.3c4.4-2.8 7.6-7 9.2-11.9s1.4-10.2-.5-15l-26.7-66.6C128 109.2 155.3 89 186.7 76.9l55.2 46c4 3.3 9 5.1 14.1 5.1s10.2-1.8 14.1-5.1l55.2-46c31.3 12.1 58.7 32.3 79.6 57.9l-26.7 66.6c-1.9 4.8-2.1 10.1-.5 15s4.9 9.1 9.2 11.9l60.7 38.2c-1.9 34.4-12.8 66.4-30.4 93.6zM256 512a256 256 0 1 0 0-512 256 256 0 1 0 0 512zm14.1-325.7c-8.4-6.1-19.8-6.1-28.2 0L194 221c-8.4 6.1-11.9 16.9-8.7 26.8l18.3 56.3c3.2 9.9 12.4 16.6 22.8 16.6l59.2 0c10.4 0 19.6-6.7 22.8-16.6l18.3-56.3c3.2-9.9-.3-20.7-8.7-26.8l-47.9-34.8z', viewBox: '0 0 512 512', label: 'Goals' }
     ];
     
-    // Position legends as a single player slot at index 0 (before Australia)
-    // Calculate the angle for the legend slot (index 0)
+    // Position legends as a single player slot at index 0
     const legendAngle = 0 * angleStep;
     
-    // Draw connection point for legend slot (like players have)
     const legendConnectionX = Math.cos(legendAngle - Math.PI / 2) * innerRadius;
     const legendConnectionY = Math.sin(legendAngle - Math.PI / 2) * innerRadius;
     
@@ -878,26 +990,23 @@
       .style('fill', 'var(--text-color)')
       .style('opacity', 0.6);
     
-    // Calculate radial rotation for labels (perpendicular to radius)
     const radialRotation = (legendAngle * 180 / Math.PI) + 90;
     
     legendConfigs.forEach((config) => {
-      // Position icon centered on its circle (like goals, assists, clubs)
-      const iconX = Math.cos(legendAngle - Math.PI / 2) * config.radius;
-      const iconY = Math.sin(legendAngle - Math.PI / 2) * config.radius;
+      // For Player icon, add offset along radius to move it more toward outer edge
+      const isPlayerIcon = config.label === 'Player';
+      const radiusOffset = isPlayerIcon ? size * 0.1 * radiusMultiplier : 0; // Move player icon 10% outward
+      const adjustedRadius = config.radius + radiusOffset;
       
-      // Icon size (smaller on mobile)
+      const iconX = Math.cos(legendAngle - Math.PI / 2) * adjustedRadius;
+      const iconY = Math.sin(legendAngle - Math.PI / 2) * adjustedRadius;
+      
       const iconSize = isMobile ? 10 : 14;
       
-      // Use visualization-specific icon color that adapts to theme
-      // CSS variables are automatically updated when theme changes
-      
-      // Add icon centered on circle (like goals circle)
       const iconGroup = legendsLayer.append('g')
         .attr('class', `legend-icon-${config.label.toLowerCase()}`)
         .attr('transform', `translate(${iconX}, ${iconY})`);
       
-      // Create icon as SVG path, centered like goals/assists circles
       const viewBoxMatch = config.viewBox.match(/(\d+)\s+(\d+)\s+(\d+)\s+(\d+)/);
       const viewBoxWidth = viewBoxMatch ? parseFloat(viewBoxMatch[3]) : 512;
       const viewBoxHeight = viewBoxMatch ? parseFloat(viewBoxMatch[4]) : 512;
@@ -906,6 +1015,7 @@
       
       const scale = iconSize / Math.max(viewBoxWidth, viewBoxHeight);
       
+      // All icons are centered on their radius position
       const iconPath = iconGroup.append('path')
         .attr('d', config.path)
         .attr('transform', `scale(${scale}) translate(${-viewBoxCenterX}, ${-viewBoxCenterY})`)
@@ -913,7 +1023,6 @@
         .style('opacity', 0.8)
         .style('cursor', 'pointer');
       
-      // Add hover handlers for tooltip
       iconPath
         .on('mouseenter', function(event) {
           tooltip.transition()
@@ -929,50 +1038,13 @@
             .style('opacity', 0);
         });
     });
-    
-    // Add country color legend - position to the right of the visualization
-    // Calculate right edge of visualization circle: centerX + playerNameRadius + padding
-    const visualizationRightEdge = centerX + playerNameRadius + 20;
-    const legendX = Math.max(visualizationRightEdge + 20, width - 200); // At least 20px from edge, or right side
-    
-    const legend = svg.append('g')
-      .attr('class', 'country-legend')
-      .attr('transform', `translate(${legendX}, 20)`);
-
-    const legendTitle = legend.append('text')
-      .attr('y', 0)
-      .attr('dy', '0.35em')
-      .style('font-size', '12px')
-      .style('font-family', 'monospace')
-      .style('font-weight', 'bold')
-      .style('fill', 'var(--text-color)')
-      .text('Countries');
-
-    const legendItems = legend.selectAll('.legend-item')
-      .data(countries.slice(0, 10)) // Show first 10 countries
-      .enter()
-      .append('g')
-      .attr('class', 'legend-item')
-      .attr('transform', (d, i) => `translate(0, ${(i + 1) * 20})`);
-
-    legendItems.append('circle')
-      .attr('r', 6)
-      .style('fill', d => colorScale(d));
-
-    legendItems.append('text')
-      .attr('x', 12)
-      .attr('dy', '0.35em')
-      .style('font-size', '10px')
-      .style('font-family', 'monospace')
-      .style('fill', 'var(--text-color)')
-      .text(d => getCountryCode(d));
   }
 </script>
 
 <div class="visualization-container">
   <div class="visualization-header">
     <h2>Player Network</h2>
-    <p>Hover over a player's name to see connections with teammates. Hover over club dots to see club names. Colors represent countries. Outer rings show goals, clubs, and national team.</p>
+      <p>Hover over a player's name to see connections with teammates. Hover over club dots to see club names. Colors represent countries. Outer rings show goals, assists, clubs, and nationality.</p>
     <p class="attribution">Visualization style inspired by <a href="https://yanouski.com/projects/xfiles-writers/" target="_blank" rel="noopener noreferrer">X-Files Writers Network</a>.</p>
   </div>
 
@@ -1048,10 +1120,6 @@
     transition: all 0.2s ease;
   }
 
-  :global(.player-name:hover) {
-    font-size: 14px !important;
-  }
-
   @media (max-width: 767px) {
     .visualization-container {
       padding: 1rem;
@@ -1064,10 +1132,6 @@
     .chart-container {
       padding: 1rem;
       min-height: 400px;
-    }
-
-    :global(.player-name) {
-      font-size: 10px !important;
     }
   }
 </style>

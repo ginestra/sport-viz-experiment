@@ -80,7 +80,7 @@
     const containerWidth = container.clientWidth || 900;
     const width = Math.min(containerWidth - 40, 900);
     const height = Math.max(400, width * 0.6);
-    const margin = { top: 40, right: 40, bottom: 60, left: 80 };
+    const margin = { top: 40, right: 200, bottom: 80, left: 80 }; // Increased right margin for legend, bottom for x-axis label
 
     const { svg, g, width: innerWidth, height: innerHeight } = createSVG(
       container,
@@ -220,10 +220,11 @@
       .style('fill', 'var(--text-color)')
       .text('Country of Provenance');
 
-    // Legend for bubble size
+    // Legend for bubble size - positioned to the right of the graph
+    const legendX = margin.left + innerWidth + 30; // 30px padding after graph ends
     const legend = svg.append('g')
       .attr('class', 'legend')
-      .attr('transform', `translate(${width - 150}, ${height - 150})`);
+      .attr('transform', `translate(${legendX}, ${height - 150})`);
 
     const legendData = [
       maxPopularity,

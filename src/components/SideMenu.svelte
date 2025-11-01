@@ -44,7 +44,8 @@
     position: fixed;
     top: 0;
     left: 0;
-    height: 100vh;
+    min-height: 100vh;
+    height: 100%;
     width: 280px;
     max-width: 85vw;
     background: var(--bg-secondary);
@@ -155,6 +156,9 @@
       position: relative;
       transform: translateX(0);
       width: 60px;
+      min-height: 100%;
+      height: auto;
+      align-self: stretch;
       flex-shrink: 0;
       transition: width 0.3s ease;
       box-shadow: none;

@@ -4,13 +4,11 @@
   import ThemeToggle from './components/ThemeToggle.svelte';
   import PlayerSuccess from './visualizations/PlayerSuccess.svelte';
   import PlayerNetwork from './visualizations/PlayerNetwork.svelte';
-  import PlayerNetworkAlt from './visualizations/PlayerNetworkAlt.svelte';
   import { theme } from './stores/theme.js';
 
   let menuOpen = false;
 
   const menuItems = [
-    { label: 'Player Network (Alt)', href: '#player-network-alt' },
     { label: 'Player Network', href: '#player-network' },
     { label: 'Player Success', href: '#player-success' },
   ];
@@ -40,10 +38,6 @@
       <ThemeToggle />
     </header>
 
-    <section id="player-network-alt" class="visualization-section">
-      <PlayerNetworkAlt />
-    </section>
-
     <section id="player-network" class="visualization-section">
       <PlayerNetwork />
     </section>
@@ -62,6 +56,7 @@
     flex-direction: column;
     background: var(--bg-primary);
     color: var(--text-color);
+    position: relative;
   }
 
   .main-content {
