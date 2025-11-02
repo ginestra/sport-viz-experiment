@@ -27,7 +27,7 @@
   </button>
 
   <nav class="menu-nav">
-    <h2 class="menu-title">Visualizations</h2>
+    <h2 class="menu-title">Navigation</h2>
     <ul class="menu-list">
       {#each menuItems as item}
         <li class="menu-item">

@@ -1,17 +1,63 @@
 <script>
   import { onMount } from 'svelte';
+  import Router, { link, location } from 'svelte-spa-router';
   import SideMenu from './components/SideMenu.svelte';
   import ThemeToggle from './components/ThemeToggle.svelte';
-  import PlayerSuccess from './visualizations/PlayerSuccess.svelte';
-  import PlayerNetwork from './visualizations/PlayerNetwork.svelte';
   import { theme } from './stores/theme.js';
+  import { getExperimentByRoute } from './data/experiments.js';
+  
+  import Home from './routes/Home.svelte';
+  import ExperimentsIndex from './routes/experiments/Index.svelte';
+  import SportVizIndex from './routes/experiments/sport-viz/Index.svelte';
+  import WomensFootball from './routes/experiments/sport-viz/womens-football/Index.svelte';
 
   let menuOpen = false;
 
-  const menuItems = [
-    { label: 'Player Network', href: '#player-network' },
-    { label: 'Player Success', href: '#player-success' },
-  ];
+  // Define routes
+  const routes = {
+    '/': Home,
+    '/experiments': ExperimentsIndex,
+    '/experiments/sport-viz': SportVizIndex,
+    '/experiments/sport-viz/womens-football': WomensFootball,
+  };
+
+  // Track current location
+  $: currentRoute = $location;
+
+  // Generate menu items based on current route
+  $: menuItems = getMenuItems(currentRoute);
+
+  function getMenuItems(route) {
+    const items = [
+      { label: 'Home', href: '#/' },
+      { label: 'Experiments', href: '#/experiments' },
+      { label: 'Sport Visualizations', href: '#/experiments/sport-viz' },
+    ];
+
+    // If on womens-football route, add visualization links
+    if (route === '/experiments/sport-viz/womens-football') {
+      items.push(
+        { label: 'Player Network', href: '#/experiments/sport-viz/womens-football#player-network' },
+        { label: 'Player Success', href: '#/experiments/sport-viz/womens-football#player-success' }
+      );
+    }
+
+    return items;
+  }
+
+  // Get page title based on route
+  $: pageTitle = getPageTitle(currentRoute);
+
+  function getPageTitle(route) {
+    if (route === '/') return 'That Lab';
+    if (route === '/experiments') return 'Experiments';
+    if (route === '/experiments/sport-viz') return 'Sport Visualizations';
+    if (route === '/experiments/sport-viz/womens-football') {
+      const exp = getExperimentByRoute(route);
+      return exp?.title || "Women's Football Visualizations";
+    }
+    return 'That Lab';
+  }
 
   onMount(() => {
     // Ensure theme is applied on mount
@@ -34,17 +80,13 @@
         <span class="hamburger-line"></span>
         <span class="hamburger-line"></span>
       </button>
-      <h1 class="app-title">Women's Football Visualizations</h1>
+      <h1 class="app-title">{pageTitle}</h1>
       <ThemeToggle />
     </header>
 
-    <section id="player-network" class="visualization-section">
-      <PlayerNetwork />
-    </section>
-
-    <section id="player-success" class="visualization-section">
-      <PlayerSuccess />
-    </section>
+    <div class="router-container">
+      <Router {routes} />
+    </div>
   </main>
 </div>
 
@@ -115,8 +157,9 @@
     text-align: center;
   }
 
-  .visualization-section {
-    padding: 0;
+  .router-container {
+    flex: 1;
+    overflow-y: auto;
   }
 
   /* Tablet and up: Side-by-side layout */
@@ -143,10 +186,6 @@
     .app-title {
       font-size: 1.75rem;
       text-align: left;
-    }
-
-    .visualization-section {
-      padding: 0;
     }
   }
 </style>
