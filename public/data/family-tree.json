@@ -1,272 +1,358 @@
 {
   "familyMembers": [
     {
-      "id": "grandpa-john",
-      "name": "John Smith",
-      "birthDate": "1920-03-15",
-      "birthPlace": "New York, USA",
-      "deathDate": "1995-07-22",
-      "deathPlace": "New York, USA",
+      "id": "great-grandma-adele",
+      "name": "Adele",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": null,
+      "deathPlace": null,
+      "placesLived": [],
+      "occupation": null,
+      "facts": ["Great grandmother (mother's side)"],
+      "photo": null,
+      "relationships": {
+        "children": ["grandma-ester", "aunt-luigia"]
+      },
+      "gender": "female"
+    },
+    {
+      "id": "grandma-ester",
+      "name": "Ester Grechi",
+      "birthDate": "1900-09-07",
+      "birthPlace": "Pavia, Italy",
+      "deathDate": "2003-04-11",
+      "deathPlace": "Pavia, Italy",
       "placesLived": [
         {
-          "place": "New York, USA",
-          "startDate": "1920",
-          "endDate": "1995"
+          "place": "Pavia, Italy",
+          "startDate": "1900",
+          "endDate": "2003"
         }
       ],
-      "occupation": ["Engineer", "Farmer"],
+      "occupation": "PE Teacher",
       "facts": [
-        "Served in World War II",
-        "Built his own house",
-        "Loved gardening"
+        "Physical education teacher",
+        "Lived to be 102 years old",
+        "Married Francesco Orio"
       ],
-      "photo": "/family-photos/john-smith.jpg",
+      "photo": null,
       "relationships": {
-        "spouse": ["grandma-mary"],
-        "children": ["father-tom", "aunt-anne"]
+        "parent": ["great-grandma-adele"],
+        "spouse": ["grandpa-francesco"],
+        "siblings": ["aunt-luigia"],
+        "children": ["uncle-vittorio", "mother-stefania"]
+      },
+      "gender": "female"
+    },
+    {
+      "id": "aunt-luigia",
+      "name": "Luigia \"Luigina\" Grechi",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": null,
+      "deathPlace": null,
+      "placesLived": [],
+      "occupation": null,
+      "facts": [
+        "Sister of Ester Grechi",
+        "Also known as Luigina"
+      ],
+      "photo": null,
+      "relationships": {
+        "parent": ["great-grandma-adele"],
+        "siblings": ["grandma-ester"]
+      },
+      "gender": "female"
+    },
+    {
+      "id": "grandpa-francesco",
+      "name": "Francesco Orio",
+      "birthDate": "1893-01-01",
+      "birthPlace": null,
+      "deathDate": "1985-01-01",
+      "deathPlace": "Pavia, Italy",
+      "placesLived": [
+        {
+          "place": "Pavia, Italy",
+          "startDate": null,
+          "endDate": "1985"
+        }
+      ],
+      "occupation": null,
+      "facts": [],
+      "photo": null,
+      "relationships": {
+        "spouse": ["grandma-ester"],
+        "children": ["mother-stefania"]
       },
       "gender": "male"
     },
     {
-      "id": "grandma-mary",
-      "name": "Mary Smith",
-      "birthDate": "1923-08-10",
-      "birthPlace": "Boston, USA",
-      "deathDate": "2001-11-05",
-      "deathPlace": "New York, USA",
+      "id": "mother-stefania",
+      "name": "Stefania Cecilia Giuseppina Orio",
+      "birthDate": "1940-02-22",
+      "birthPlace": "Pavia, Italy",
+      "deathDate": null,
+      "deathPlace": null,
       "placesLived": [
         {
-          "place": "Boston, USA",
+          "place": "Pavia, Italy",
+          "startDate": "1940",
+          "endDate": null
+        },
+        {
+          "place": "Munich, Germany",
+          "startDate": null,
+          "endDate": null
+        },
+        {
+          "place": "London, UK",
+          "startDate": null,
+          "endDate": null
+        }
+      ],
+      "occupation": "Psychologist",
+      "facts": [
+        "Lived in multiple countries",
+        "Married in Milan, 10 May 1976"
+      ],
+      "photo": null,
+      "relationships": {
+        "parent": ["grandma-ester", "grandpa-francesco"],
+        "spouse": ["dad-vincenzo"],
+        "siblings": ["uncle-vittorio"]
+      },
+      "gender": "female"
+    },
+    {
+      "id": "uncle-vittorio",
+      "name": "Vittorio Ponzio",
+      "birthDate": "1923-01-01",
+      "birthPlace": "Pavia, Italy",
+      "deathDate": "1996-01-01",
+      "deathPlace": "Milan, Italy",
+      "placesLived": [
+        {
+          "place": "Pavia, Italy",
           "startDate": "1923",
-          "endDate": "1945"
+          "endDate": null
         },
         {
-          "place": "New York, USA",
-          "startDate": "1945",
-          "endDate": "2001"
+          "place": "Milan, Italy",
+          "startDate": null,
+          "endDate": "1996"
         }
       ],
-      "occupation": "Teacher",
+      "occupation": "Engineer",
       "facts": [
-        "Taught for 40 years",
-        "Amateur painter",
-        "Made the best apple pie"
+        "Son of Ester Grechi and her previous husband Ponzio"
       ],
-      "photo": "/family-photos/mary-smith.jpg",
+      "photo": null,
       "relationships": {
-        "spouse": ["grandpa-john"],
-        "children": ["father-tom", "aunt-anne"]
-      },
-      "gender": "female"
-    },
-    {
-      "id": "father-tom",
-      "name": "Tom Smith",
-      "birthDate": "1950-05-20",
-      "birthPlace": "New York, USA",
-      "placesLived": [
-        {
-          "place": "New York, USA",
-          "startDate": "1950",
-          "endDate": "1975"
-        },
-        {
-          "place": "Chicago, USA",
-          "startDate": "1975",
-          "endDate": "present"
-        }
-      ],
-      "occupation": "Doctor",
-      "facts": [
-        "Graduated top of medical school",
-        "Marathon runner",
-        "Collects vintage watches"
-      ],
-      "photo": "/family-photos/tom-smith.jpg",
-      "relationships": {
-        "parent": ["grandpa-john", "grandma-mary"],
-        "siblings": ["aunt-anne"],
-        "spouse": ["mother-sarah"],
-        "children": ["child-alice", "child-bob"]
+        "parent": ["grandma-ester"],
+        "siblings": ["mother-stefania"]
       },
       "gender": "male"
     },
     {
-      "id": "mother-sarah",
-      "name": "Sarah Smith",
-      "birthDate": "1952-09-12",
-      "birthPlace": "Chicago, USA",
+      "id": "grandma-maria",
+      "name": "Maria Ferraro",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": "1988-01-01",
+      "deathPlace": "Salerno, Italy",
       "placesLived": [
         {
-          "place": "Chicago, USA",
-          "startDate": "1952",
-          "endDate": "present"
+          "place": "Salerno, Italy",
+          "startDate": null,
+          "endDate": "1988"
         }
       ],
-      "occupation": "Nurse",
-      "facts": [
-        "Volunteers at animal shelter",
-        "Speaks three languages",
-        "Published poet"
-      ],
-      "photo": "/family-photos/sarah-smith.jpg",
+      "occupation": null,
+      "facts": [],
+      "photo": null,
       "relationships": {
-        "spouse": ["father-tom"],
-        "children": ["child-alice", "child-bob"]
+        "spouse": ["grandpa-ferdinando"],
+        "children": ["dad-vincenzo", "uncle-augusto", "aunt-anna", "aunt-pia"]
       },
       "gender": "female"
     },
     {
-      "id": "aunt-anne",
-      "name": "Anne Johnson",
-      "birthDate": "1955-12-03",
-      "birthPlace": "New York, USA",
-      "placesLived": [
-        {
-          "place": "New York, USA",
-          "startDate": "1955",
-          "endDate": "1980"
-        },
-        {
-          "place": "San Francisco, USA",
-          "startDate": "1980",
-          "endDate": "present"
-        }
-      ],
-      "occupation": "Software Engineer",
+      "id": "grandpa-ferdinando",
+      "name": "Ferdinando De Caro",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": "1959-01-01",
+      "deathPlace": null,
+      "placesLived": [],
+      "occupation": "Baron",
       "facts": [
-        "Early adopter of personal computers",
-        "Traveled to 30+ countries",
-        "Yoga instructor"
+        "Had the title of Baron"
       ],
-      "photo": "/family-photos/anne-johnson.jpg",
+      "photo": null,
       "relationships": {
-        "parent": ["grandpa-john", "grandma-mary"],
-        "siblings": ["father-tom"],
-        "spouse": ["uncle-david"],
-        "children": ["cousin-charlie"]
-      },
-      "gender": "female"
-    },
-    {
-      "id": "uncle-david",
-      "name": "David Johnson",
-      "birthDate": "1954-01-18",
-      "birthPlace": "Los Angeles, USA",
-      "placesLived": [
-        {
-          "place": "Los Angeles, USA",
-          "startDate": "1954",
-          "endDate": "1980"
-        },
-        {
-          "place": "San Francisco, USA",
-          "startDate": "1980",
-          "endDate": "present"
-        }
-      ],
-      "occupation": "Architect",
-      "facts": [
-        "Designed award-winning buildings",
-        "Avid photographer",
-        "Home brewing enthusiast"
-      ],
-      "photo": "/family-photos/david-johnson.jpg",
-      "relationships": {
-        "spouse": ["aunt-anne"],
-        "children": ["cousin-charlie"]
+        "spouse": ["grandma-maria"],
+        "children": ["dad-vincenzo", "uncle-augusto", "aunt-anna", "aunt-pia"]
       },
       "gender": "male"
     },
     {
-      "id": "child-alice",
-      "name": "Alice Smith",
-      "birthDate": "1985-06-25",
-      "birthPlace": "Chicago, USA",
+      "id": "dad-vincenzo",
+      "name": "Vincenzo Ferraro",
+      "birthDate": "1943-04-07",
+      "birthPlace": "Nocera Inferiore, Salerno, Italy",
+      "deathDate": "2021-04-02",
+      "deathPlace": "Pavia, Italy",
       "placesLived": [
         {
-          "place": "Chicago, USA",
+          "place": "Nocera Inferiore, Salerno, Italy",
+          "startDate": "1943",
+          "endDate": "1970"
+        },
+        {
+          "place": "Milan, Italy",
+          "startDate": "1970",
+          "endDate": "1985"
+        },
+        {
+          "place": "Pavia, Italy",
           "startDate": "1985",
-          "endDate": "2008"
-        },
-        {
-          "place": "New York, USA",
-          "startDate": "2008",
-          "endDate": "present"
+          "endDate": "2021"
         }
       ],
-      "occupation": "Artist",
+      "occupation": "Social Worker",
       "facts": [
-        "Exhibited in galleries",
-        "Learned to play piano at age 5",
-        "Advocate for mental health"
+        "Married Stefania Orio in Milan on 10 May 1976",
+        "Moved to Milan in the 70s",
+        "Moved to Pavia in 1985"
       ],
-      "photo": "/family-photos/alice-smith.jpg",
+      "photo": null,
       "relationships": {
-        "parent": ["father-tom", "mother-sarah"],
-        "siblings": ["child-bob"]
-      },
-      "gender": "female"
-    },
-    {
-      "id": "child-bob",
-      "name": "Bob Smith",
-      "birthDate": "1988-11-30",
-      "birthPlace": "Chicago, USA",
-      "placesLived": [
-        {
-          "place": "Chicago, USA",
-          "startDate": "1988",
-          "endDate": "2010"
-        },
-        {
-          "place": "Seattle, USA",
-          "startDate": "2010",
-          "endDate": "present"
-        }
-      ],
-      "occupation": "Musician",
-      "facts": [
-        "Plays in a band",
-        "Studied jazz at conservatory",
-        "Rides a motorcycle"
-      ],
-      "photo": "/family-photos/bob-smith.jpg",
-      "relationships": {
-        "parent": ["father-tom", "mother-sarah"],
-        "siblings": ["child-alice"]
+        "parent": ["grandma-maria", "grandpa-ferdinando"],
+        "spouse": ["mother-stefania"],
+        "siblings": ["uncle-augusto", "aunt-anna", "aunt-pia"]
       },
       "gender": "male"
     },
     {
-      "id": "cousin-charlie",
-      "name": "Charlie Johnson",
-      "birthDate": "1990-04-14",
-      "birthPlace": "San Francisco, USA",
+      "id": "uncle-augusto",
+      "name": "Augusto De Caro",
+      "birthDate": "1944-01-01",
+      "birthPlace": "Belluno, Italy",
+      "deathDate": null,
+      "deathPlace": null,
       "placesLived": [
         {
-          "place": "San Francisco, USA",
-          "startDate": "1990",
-          "endDate": "2012"
+          "place": "Belluno, Italy",
+          "startDate": "1944",
+          "endDate": null
         },
         {
-          "place": "Portland, USA",
-          "startDate": "2012",
+          "place": "Coperchia, Salerno, Italy",
+          "startDate": null,
           "endDate": "present"
         }
       ],
-      "occupation": "Chef",
+      "occupation": null,
       "facts": [
-        "Opened own restaurant at 28",
-        "Featured in food magazines",
-        "Competitive cyclist"
+        "Living in Coperchia, Salerno",
+        "Married to Paola Dionigi (died 2017)",
+        "Has 3 children"
       ],
-      "photo": "/family-photos/charlie-johnson.jpg",
+      "photo": null,
       "relationships": {
-        "parent": ["aunt-anne", "uncle-david"]
+        "parent": ["grandma-maria", "grandpa-ferdinando"],
+        "spouse": ["aunt-paola"],
+        "siblings": ["dad-vincenzo", "aunt-anna", "aunt-pia"],
+        "children": []
+      },
+      "gender": "male"
+    },
+    {
+      "id": "aunt-paola",
+      "name": "Paola Dionigi",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": "2017-01-01",
+      "deathPlace": null,
+      "placesLived": [],
+      "occupation": null,
+      "facts": [
+        "Married to Augusto De Caro",
+        "Had 3 children"
+      ],
+      "photo": null,
+      "relationships": {
+        "spouse": ["uncle-augusto"],
+        "children": []
+      },
+      "gender": "female"
+    },
+    {
+      "id": "aunt-anna",
+      "name": "Anna Ferraro Longo",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": null,
+      "deathPlace": null,
+      "placesLived": [],
+      "occupation": null,
+      "facts": [],
+      "photo": null,
+      "relationships": {
+        "parent": ["grandma-maria", "grandpa-ferdinando"],
+        "siblings": ["dad-vincenzo", "uncle-augusto", "aunt-pia"]
+      },
+      "gender": "female"
+    },
+    {
+      "id": "aunt-pia",
+      "name": "Pia Ferraro Caiazza",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": "2022-01-01",
+      "deathPlace": "Cava dei Tirreni, Salerno, Italy",
+      "placesLived": [
+        {
+          "place": "Cava dei Tirreni, Salerno, Italy",
+          "startDate": null,
+          "endDate": "2022"
+        }
+      ],
+      "occupation": null,
+      "facts": [
+        "Married to Ludovico Caiazza",
+        "Had 2 children"
+      ],
+      "photo": null,
+      "relationships": {
+        "parent": ["grandma-maria", "grandpa-ferdinando"],
+        "spouse": ["uncle-ludovico"],
+        "siblings": ["dad-vincenzo", "uncle-augusto", "aunt-anna"],
+        "children": []
+      },
+      "gender": "female"
+    },
+    {
+      "id": "uncle-ludovico",
+      "name": "Ludovico Caiazza",
+      "birthDate": null,
+      "birthPlace": null,
+      "deathDate": null,
+      "deathPlace": null,
+      "placesLived": [],
+      "occupation": null,
+      "facts": [
+        "Married to Pia Ferraro Caiazza",
+        "Had 2 children"
+      ],
+      "photo": null,
+      "relationships": {
+        "spouse": ["aunt-pia"],
+        "children": []
       },
       "gender": "male"
     }
   ]
 }
-

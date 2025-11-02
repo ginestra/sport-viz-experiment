@@ -4,7 +4,7 @@
   import { createTooltip } from '../utils/d3-helpers.js';
   import {
     loadFamilyData,
-    buildTreeStructure as buildFamilyTree,
+    buildAllTreeHierarchies,
     toD3Hierarchy,
     getLinks,
     getSpouseLinks as getSpouseLinksFromData,
@@ -22,11 +22,10 @@
   let selectedNode = null;
   let hoveredNode = null;
   let svg, g, zoom;
-  let root = null;
-  let links = [];
+  let roots = []; // Changed from single root to array
+  let allLinks = []; // All links from all trees
   let spouseLinks = [];
-  let nodes = [];
-  let treeData = null;
+  let allNodes = []; // All nodes from all trees
   let linkGroup; // For highlighting connections
 
   function handleResize() {
@@ -115,296 +114,413 @@
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    // Build tree structure
+    // Build multiple tree structures
     try {
-      treeData = buildFamilyTree(data);
-      root = toD3Hierarchy(treeData);
+      const treeHierarchies = buildAllTreeHierarchies(data);
+      roots = treeHierarchies.map(th => th.hierarchy);
+      
+      // Calculate spacing for side-by-side trees - more generous spacing
+      const numTrees = roots.length;
+      // Use minimum 300px per tree, or distribute evenly if more space available
+      const minTreeWidth = 300;
+      const availableWidth = innerWidth - (60 * (numTrees - 1)); // 60px gap between trees
+      const calculatedTreeWidth = Math.max(minTreeWidth, availableWidth / numTrees);
+      const treeWidth = Math.min(calculatedTreeWidth, innerWidth / numTrees * 0.9); // Max 90% per tree
+      const gapBetweenTrees = 100; // Fixed gap between trees
+      const totalTreeWidth = treeWidth * numTrees + gapBetweenTrees * (numTrees - 1);
+      const startX = (innerWidth - totalTreeWidth) / 2; // Center trees if there's extra space
+      
+      // Layout each tree with proper positioning - increased separation
+      const treeLayout = d3.tree()
+        .size([treeWidth, innerHeight - 120])
+        .separation((a, b) => {
+          if (a.parent === b.parent) {
+            // Siblings: increased minimum separation to prevent overlap
+            const variation = ((a.data.data.id.charCodeAt(0) + b.data.data.id.charCodeAt(0)) % 30) / 100;
+            return 1.2 + variation; // Increased from 0.8 to 1.2 minimum
+          }
+          return 1.5; // Increased from 1.2
+        });
+
+      // Position each tree side-by-side with improved spacing
+      roots.forEach((root, treeIndex) => {
+        treeLayout(root);
+        applyOrganicPositioning(root, treeWidth);
+        
+        // Calculate offset: start position + tree index * (tree width + gap)
+        const xOffset = startX + treeIndex * (treeWidth + gapBetweenTrees);
+        root.each(node => {
+          node.x += xOffset;
+        });
+      });
+
+      // Collect all links and nodes from all trees - deduplicate by person ID
+      // First pass: collect all unique nodes (one per person)
+      allNodes = [];
+      const allNodeMap = new Map();
+      const processedNodeIds = new Set();
+      
+      roots.forEach(root => {
+        root.each(node => {
+          const nodeId = node.data.data.id;
+          // Only add node if we haven't seen this person ID before
+          if (!processedNodeIds.has(nodeId)) {
+            processedNodeIds.add(nodeId);
+            allNodes.push(node);
+            allNodeMap.set(nodeId, node);
+          }
+          // If duplicate, we ignore it and keep the first instance
+        });
+      });
+      
+      // Second pass: collect links using only the deduplicated nodes
+      allLinks = [];
+      const processedLinks = new Set();
+      
+      roots.forEach(root => {
+        const treeLinks = getLinks(root);
+        
+        treeLinks.forEach(link => {
+          const sourceId = link.source.data.data.id;
+          const targetId = link.target.data.data.id;
+          const linkKey = `${sourceId}-${targetId}`;
+          
+          // Only add link if we haven't seen it before and both nodes exist in our deduplicated set
+          if (!processedLinks.has(linkKey)) {
+            const dedupSource = allNodeMap.get(sourceId);
+            const dedupTarget = allNodeMap.get(targetId);
+            if (dedupSource && dedupTarget) {
+              processedLinks.add(linkKey);
+              allLinks.push({
+                source: dedupSource,
+                target: dedupTarget,
+                relationship: link.relationship
+              });
+            }
+          }
+        });
+      });
+
+      // Get spouse links (these connect different trees)
+      spouseLinks = getSpouseLinksFromData(data, allNodeMap);
+
+      // Create tooltip
+      const tooltip = createTooltip();
+
+      // Setup zoom behavior
+      zoom = d3.zoom()
+        .scaleExtent([0.3, 3])
+        .on('zoom', (event) => {
+          g.attr('transform', event.transform);
+        });
+
+      svg.call(zoom);
+
+      // Render links (parent-child) with organic curves
+      linkGroup = g.append('g').attr('class', 'links');
+
+      linkGroup.selectAll('.link')
+        .data(allLinks)
+        .enter()
+        .append('path')
+        .attr('class', 'link')
+        .attr('d', d => {
+          // Custom path for more organic branching using Bézier curves
+          const path = d3.path();
+          const midY = (d.source.y + d.target.y) / 2;
+          // Use a deterministic offset based on node position for consistent organic curves
+          const offsetX = (d.target.x % 50) - 25; // Deterministic but varied
+          const controlX = d.target.x + offsetX * 0.6;
+          path.moveTo(d.source.x, d.source.y);
+          path.bezierCurveTo(
+            d.source.x, midY,
+            controlX, midY,
+            d.target.x, d.target.y
+          );
+          return path.toString();
+        })
+        .attr('fill', 'none')
+        .attr('stroke', d => {
+          // Color by generation depth for visual hierarchy
+          const depth = d.target.depth;
+          const colors = [
+            'var(--primary-color)',
+            '#42b883',
+            '#35495e',
+            '#ff6b6b',
+            '#4ecdc4'
+          ];
+          return colors[depth % colors.length] || 'var(--viz-connection-color)';
+        })
+        .attr('stroke-width', d => {
+          // Thicker near root, thinner at leaves
+          return Math.max(1.5, 3 - d.target.depth * 0.3);
+        })
+        .attr('opacity', d => {
+          // More opacity near root
+          return Math.max(0.3, 0.6 - d.target.depth * 0.1);
+        })
+        .style('transition', 'all 0.3s ease');
+
+      // Render spouse links - make them prominent and visible for tree-to-tree connections
+      linkGroup.selectAll('.spouse-link')
+        .data(spouseLinks)
+        .enter()
+        .append('path')
+        .attr('class', 'spouse-link')
+        .attr('d', d => {
+          const path = d3.path();
+          const dx = d.target.x - d.source.x;
+          const dy = d.target.y - d.source.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Create a curved path for longer distances (connecting different trees)
+          if (distance > 100) {
+            // Horizontal curve for tree-to-tree connections
+            const midX = (d.source.x + d.target.x) / 2;
+            const curveHeight = -Math.min(distance * 0.3, 80);
+            path.moveTo(d.source.x, d.source.y);
+            path.bezierCurveTo(
+              midX, d.source.y + curveHeight,
+              midX, d.target.y + curveHeight,
+              d.target.x, d.target.y
+            );
+          } else {
+            // Simple curve for same-tree spouse connections
+            const midX = (d.source.x + d.target.x) / 2;
+            const curveHeight = -25;
+            path.moveTo(d.source.x, d.source.y);
+            path.quadraticCurveTo(midX, d.source.y + curveHeight, d.target.x, d.target.y);
+          }
+          return path.toString();
+        })
+        .attr('fill', 'none')
+        .attr('stroke', 'var(--primary-color)')
+        .attr('stroke-width', 3) // Thicker for visibility
+        .attr('stroke-dasharray', '6,3') // Dashed pattern
+        .attr('opacity', 0.7) // More visible
+        .style('transition', 'all 0.3s ease')
+        .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))'); // Shadow for prominence
+
+      // Render nodes from all trees
+      const nodeGroup = g.append('g').attr('class', 'nodes');
+
+      const nodeElements = nodeGroup.selectAll('.node')
+        .data(allNodes)
+        .enter()
+        .append('g')
+        .attr('class', 'node')
+        .attr('transform', d => `translate(${d.x},${d.y})`)
+        .style('cursor', 'pointer');
+
+      // Node circles with photos or initials - enhanced styling
+      const nodeCircles = nodeElements.append('circle')
+        .attr('r', 32)
+        .attr('fill', d => getNodeColor(d))
+        .attr('stroke', 'var(--border-color)')
+        .attr('stroke-width', 2.5)
+        .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))')
+        .on('mouseenter', function(event, d) {
+          hoveredNode = d;
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .attr('r', 38)
+            .attr('stroke-width', 3.5)
+            .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))');
+          
+          // Highlight connected links
+          highlightConnections(d);
+          
+          showTooltip(event, d, tooltip);
+        })
+        .on('mouseleave', function(event, d) {
+          hoveredNode = null;
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .attr('r', 32)
+            .attr('stroke-width', 2.5)
+            .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))');
+          
+          // Unhighlight connections
+          unhighlightConnections();
+          
+          tooltip.transition().duration(200).style('opacity', 0);
+        })
+        .on('click', function(event, d) {
+          event.stopPropagation();
+          selectedNode = selectedNode?.data?.data?.id === d.data.data.id ? null : d;
+          // Highlight selected node's connections
+          if (selectedNode) {
+            highlightConnections(selectedNode);
+          } else {
+            unhighlightConnections();
+          }
+        });
+
+      // Add photos or initials with better styling
+      nodeElements.each(function(d) {
+        const member = d.data.data;
+        const nodeGroup = d3.select(this);
+        
+        if (member.photo) {
+          // Try to add image with better error handling
+          const image = nodeGroup.append('image')
+            .attr('x', -28)
+            .attr('y', -28)
+            .attr('width', 56)
+            .attr('height', 56)
+            .attr('href', member.photo)
+            .attr('clip-path', 'url(#nodeClip)')
+            .style('opacity', 0)
+            .on('load', function() {
+              d3.select(this)
+                .transition()
+                .duration(300)
+                .style('opacity', 1);
+            })
+            .on('error', function() {
+              // Fallback to initials if image fails to load
+              d3.select(this).remove();
+              addInitials(nodeGroup, member);
+            });
+        } else {
+          addInitials(nodeGroup, member);
+        }
+      });
+
+      // Add clip path for circular photos
+      svg.append('defs')
+        .append('clipPath')
+        .attr('id', 'nodeClip')
+        .append('circle')
+        .attr('r', 28);
+
+      // Add name labels
+      nodeElements.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dy', 45)
+        .attr('font-size', '12px')
+        .attr('fill', 'var(--text-color)')
+        .text(d => d.data.data.name.split(' ')[0]) // First name only
+        .style('pointer-events', 'none');
+
+      // Center the view after all nodes are rendered
+      setTimeout(() => {
+        const bounds = getTreeBounds();
+        const treeWidth = bounds.x1 - bounds.x0;
+        const treeHeight = bounds.y1 - bounds.y0;
+        
+        // Avoid division by zero
+        if (treeWidth === 0 || treeHeight === 0) {
+          return;
+        }
+        
+        // Calculate scale to fit tree with padding
+        const padding = 80;
+        const scaleX = (innerWidth - padding * 2) / treeWidth;
+        const scaleY = (innerHeight - padding * 2) / treeHeight;
+        const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in more than 1x
+        
+        // Calculate center of tree in node coordinate space
+        const centerX = (bounds.x0 + bounds.x1) / 2;
+        const centerY = (bounds.y0 + bounds.y1) / 2;
+        
+        // Calculate translation to center tree in viewport
+        // The transform applies to g, so coordinates are relative to margin origin
+        const translateX = (innerWidth / 2) - (centerX * scale);
+        const translateY = (innerHeight / 2) - (centerY * scale);
+        
+        const initialTransform = d3.zoomIdentity
+          .translate(translateX, translateY)
+          .scale(scale);
+
+        svg.call(zoom.transform, initialTransform);
+      }, 10);
     } catch (err) {
       console.error('Error building tree:', err);
       error = err.message;
       return;
     }
-
-    // Setup tree layout with organic positioning
-    const treeLayout = d3.tree()
-      .size([innerWidth - 100, innerHeight - 100])
-      .separation((a, b) => {
-        // Organic spacing: siblings closer together, but with variation
-        if (a.parent === b.parent) {
-          // Deterministic variation based on node data
-          const variation = ((a.data.data.id.charCodeAt(0) + b.data.data.id.charCodeAt(0)) % 30) / 100;
-          return 0.8 + variation;
-        }
-        return 1.2;
-      });
-
-    treeLayout(root);
-
-    // Apply organic positioning adjustments for natural branching
-    applyOrganicPositioning(root, innerWidth);
-
-    // Get links and nodes
-    links = getLinks(root);
-    
-    // Create node map for spouse links
-    const nodeMap = new Map();
-    root.each(node => {
-      nodeMap.set(node.data.data.id, node);
-    });
-
-    spouseLinks = getSpouseLinksFromData(data, nodeMap);
-    nodes = root.descendants();
-
-    // Create tooltip
-    const tooltip = createTooltip();
-
-    // Setup zoom behavior
-    zoom = d3.zoom()
-      .scaleExtent([0.3, 3])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform);
-      });
-
-    svg.call(zoom);
-
-    // Render links (parent-child) with organic curves
-    linkGroup = g.append('g').attr('class', 'links');
-
-    linkGroup.selectAll('.link')
-      .data(links)
-      .enter()
-      .append('path')
-      .attr('class', 'link')
-      .attr('d', d => {
-        // Custom path for more organic branching using Bézier curves
-        const path = d3.path();
-        const midY = (d.source.y + d.target.y) / 2;
-        // Use a deterministic offset based on node position for consistent organic curves
-        const offsetX = (d.target.x % 50) - 25; // Deterministic but varied
-        const controlX = d.target.x + offsetX * 0.6;
-        path.moveTo(d.source.x, d.source.y);
-        path.bezierCurveTo(
-          d.source.x, midY,
-          controlX, midY,
-          d.target.x, d.target.y
-        );
-        return path.toString();
-      })
-      .attr('fill', 'none')
-      .attr('stroke', d => {
-        // Color by generation depth for visual hierarchy
-        const depth = d.target.depth;
-        const colors = [
-          'var(--primary-color)',
-          '#42b883',
-          '#35495e',
-          '#ff6b6b',
-          '#4ecdc4'
-        ];
-        return colors[depth % colors.length] || 'var(--viz-connection-color)';
-      })
-      .attr('stroke-width', d => {
-        // Thicker near root, thinner at leaves
-        return Math.max(1.5, 3 - d.target.depth * 0.3);
-      })
-      .attr('opacity', d => {
-        // More opacity near root
-        return Math.max(0.3, 0.6 - d.target.depth * 0.1);
-      })
-      .style('transition', 'all 0.3s ease');
-
-    // Render spouse links (horizontal) with organic curves
-    linkGroup.selectAll('.spouse-link')
-      .data(spouseLinks)
-      .enter()
-      .append('path')
-      .attr('class', 'spouse-link')
-      .attr('d', d => {
-        const path = d3.path();
-        const midX = (d.source.x + d.target.x) / 2;
-        // Deterministic curve height based on positions
-        const curveHeight = -25 + ((d.source.x + d.target.x) % 20) - 10;
-        path.moveTo(d.source.x, d.source.y);
-        path.quadraticCurveTo(midX, d.source.y + curveHeight, d.target.x, d.target.y);
-        return path.toString();
-      })
-      .attr('fill', 'none')
-      .attr('stroke', 'var(--primary-color)')
-      .attr('stroke-width', 1.5)
-      .attr('stroke-dasharray', '5,3')
-      .attr('opacity', 0.4)
-      .style('transition', 'all 0.3s ease');
-
-    // Render nodes
-    const nodeGroup = g.append('g').attr('class', 'nodes');
-
-    const nodeElements = nodeGroup.selectAll('.node')
-      .data(nodes)
-      .enter()
-      .append('g')
-      .attr('class', 'node')
-      .attr('transform', d => `translate(${d.x},${d.y})`)
-      .style('cursor', 'pointer');
-
-    // Node circles with photos or initials - enhanced styling
-    const nodeCircles = nodeElements.append('circle')
-      .attr('r', 32)
-      .attr('fill', d => getNodeColor(d))
-      .attr('stroke', 'var(--border-color)')
-      .attr('stroke-width', 2.5)
-      .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))')
-      .on('mouseenter', function(event, d) {
-        hoveredNode = d;
-        d3.select(this)
-          .transition()
-          .duration(200)
-          .attr('r', 38)
-          .attr('stroke-width', 3.5)
-          .style('filter', 'drop-shadow(0 4px 8px rgba(0,0,0,0.3))');
-        
-        // Highlight connected links
-        highlightConnections(d);
-        
-        showTooltip(event, d, tooltip);
-      })
-      .on('mouseleave', function(event, d) {
-        hoveredNode = null;
-        d3.select(this)
-          .transition()
-          .duration(200)
-          .attr('r', 32)
-          .attr('stroke-width', 2.5)
-          .style('filter', 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))');
-        
-        // Unhighlight connections
-        unhighlightConnections();
-        
-        tooltip.transition().duration(200).style('opacity', 0);
-      })
-      .on('click', function(event, d) {
-        event.stopPropagation();
-        selectedNode = selectedNode?.data?.data?.id === d.data.data.id ? null : d;
-        // Highlight selected node's connections
-        if (selectedNode) {
-          highlightConnections(selectedNode);
-        } else {
-          unhighlightConnections();
-        }
-      });
-
-    // Add photos or initials with better styling
-    nodeElements.each(function(d) {
-      const member = d.data.data;
-      const nodeGroup = d3.select(this);
-      
-      if (member.photo) {
-        // Try to add image with better error handling
-        const image = nodeGroup.append('image')
-          .attr('x', -28)
-          .attr('y', -28)
-          .attr('width', 56)
-          .attr('height', 56)
-          .attr('href', member.photo)
-          .attr('clip-path', 'url(#nodeClip)')
-          .style('opacity', 0)
-          .on('load', function() {
-            d3.select(this)
-              .transition()
-              .duration(300)
-              .style('opacity', 1);
-          })
-          .on('error', function() {
-            // Fallback to initials if image fails to load
-            d3.select(this).remove();
-            addInitials(nodeGroup, member);
-          });
-      } else {
-        addInitials(nodeGroup, member);
-      }
-    });
-
-    // Add clip path for circular photos
-    svg.append('defs')
-      .append('clipPath')
-      .attr('id', 'nodeClip')
-      .append('circle')
-      .attr('r', 28);
-
-    // Add name labels
-    nodeElements.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', 45)
-      .attr('font-size', '12px')
-      .attr('fill', 'var(--text-color)')
-      .text(d => d.data.data.name.split(' ')[0]) // First name only
-      .style('pointer-events', 'none');
-
-    // Center the view after all nodes are rendered
-    setTimeout(() => {
-      const bounds = getTreeBounds(root);
-      const treeWidth = bounds.x1 - bounds.x0;
-      const treeHeight = bounds.y1 - bounds.y0;
-      
-      // Avoid division by zero
-      if (treeWidth === 0 || treeHeight === 0) {
-        return;
-      }
-      
-      // Calculate scale to fit tree with padding
-      const padding = 80;
-      const scaleX = (innerWidth - padding * 2) / treeWidth;
-      const scaleY = (innerHeight - padding * 2) / treeHeight;
-      const scale = Math.min(scaleX, scaleY, 1); // Don't zoom in more than 1x
-      
-      // Calculate center of tree in node coordinate space
-      const centerX = (bounds.x0 + bounds.x1) / 2;
-      const centerY = (bounds.y0 + bounds.y1) / 2;
-      
-      // Calculate translation to center tree in viewport
-      // The transform applies to g, so coordinates are relative to margin origin
-      const translateX = (innerWidth / 2) - (centerX * scale);
-      const translateY = (innerHeight / 2) - (centerY * scale);
-      
-      const initialTransform = d3.zoomIdentity
-        .translate(translateX, translateY)
-        .scale(scale);
-
-      svg.call(zoom.transform, initialTransform);
-    }, 10);
   }
 
   function applyOrganicPositioning(root, width) {
     // Apply organic variations to node positions for natural branching
+    // Reduced variation to prevent overlaps
     root.each(node => {
       if (node.parent) {
         const depth = node.depth;
         const member = node.data.data;
         // Deterministic variation based on member ID for consistent positioning
         const idHash = member.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const variationFactor = 1 + depth * 0.15;
-        const variation = ((idHash % 100) - 50) * 0.8 * variationFactor;
+        const variationFactor = 1 + depth * 0.1; // Reduced from 0.15
+        const variation = ((idHash % 100) - 50) * 0.4 * variationFactor; // Reduced from 0.8
         node.x += variation;
         
-        // Add slight vertical offset for more organic feel
-        const yVariation = ((idHash % 20) - 10) * 0.5;
+        // Reduced vertical offset to prevent overlaps
+        const yVariation = ((idHash % 20) - 10) * 0.3; // Reduced from 0.5
         node.y += yVariation;
+      }
+    });
+    
+    // Ensure minimum spacing between nodes at same depth
+    const nodesByDepth = new Map();
+    root.each(node => {
+      if (!nodesByDepth.has(node.depth)) {
+        nodesByDepth.set(node.depth, []);
+      }
+      nodesByDepth.get(node.depth).push(node);
+    });
+    
+    // Sort nodes at each depth by x and ensure minimum horizontal spacing
+    nodesByDepth.forEach((nodes, depth) => {
+      if (nodes.length > 1) {
+        nodes.sort((a, b) => a.x - b.x);
+        const minHorizontalSpacing = 80; // Minimum horizontal spacing between nodes
+        for (let i = 1; i < nodes.length; i++) {
+          const prevNode = nodes[i - 1];
+          const currentNode = nodes[i];
+          const currentSpacing = currentNode.x - prevNode.x;
+          if (currentSpacing < minHorizontalSpacing) {
+            const adjustment = minHorizontalSpacing - currentSpacing;
+            currentNode.x += adjustment;
+            // Adjust all subsequent nodes
+            for (let j = i + 1; j < nodes.length; j++) {
+              nodes[j].x += adjustment;
+            }
+          }
+        }
       }
     });
   }
 
-  function getTreeBounds(root) {
+  function getTreeBounds() {
     let x0 = Infinity;
     let x1 = -Infinity;
     let y0 = Infinity;
     let y1 = -Infinity;
 
-    root.each(d => {
-      // Account for node radius in bounds
-      const nodeRadius = 40; // Node radius + label space
+    // Account for all nodes from all trees
+    allNodes.forEach(d => {
+      // Account for node radius (32px) + label space (about 60px total for safety)
+      const nodeRadius = 70; // Increased to account for node + label + padding
       if (d.x - nodeRadius < x0) x0 = d.x - nodeRadius;
       if (d.x + nodeRadius > x1) x1 = d.x + nodeRadius;
       if (d.y - nodeRadius < y0) y0 = d.y - nodeRadius;
       if (d.y + nodeRadius > y1) y1 = d.y + nodeRadius;
+    });
+
+    // Also account for spouse links that may extend beyond nodes
+    spouseLinks.forEach(link => {
+      const nodeRadius = 40;
+      const sourceX = link.source.x;
+      const targetX = link.target.x;
+      const minX = Math.min(sourceX, targetX);
+      const maxX = Math.max(sourceX, targetX);
+      
+      if (minX - nodeRadius < x0) x0 = minX - nodeRadius;
+      if (maxX + nodeRadius > x1) x1 = maxX + nodeRadius;
     });
 
     // If bounds are invalid, return default
@@ -453,7 +569,10 @@
     
     linkGroup.selectAll('.spouse-link')
       .style('opacity', d => {
-        return (d.source === node || d.target === node) ? 0.8 : 0.2;
+        return (d.source === node || d.target === node) ? 1.0 : 0.3;
+      })
+      .attr('stroke-width', d => {
+        return (d.source === node || d.target === node) ? 4 : 3;
       });
   }
 
@@ -466,7 +585,8 @@
         .attr('stroke-width', d => Math.max(1.5, 3 - d.target.depth * 0.3));
       
       linkGroup.selectAll('.spouse-link')
-        .style('opacity', 0.4);
+        .style('opacity', 0.7)
+        .attr('stroke-width', 3);
     }
   }
 
@@ -514,8 +634,8 @@
       <h2>Family Tree</h2>
       <p>Interactive family tree visualization. Hover over nodes for details, click to select, zoom and pan to explore.</p>
       <button class="reset-btn" on:click={() => {
-        if (svg && zoom && root && container) {
-          const bounds = getTreeBounds(root);
+        if (svg && zoom && allNodes.length > 0 && container) {
+          const bounds = getTreeBounds();
           const containerWidth = container?.clientWidth || 900;
           const containerHeight = container?.clientHeight || 800;
           const margin = { top: 60, right: 60, bottom: 60, left: 60 };

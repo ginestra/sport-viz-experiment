@@ -205,6 +205,75 @@ export function formatDateRange(startDate, endDate) {
 }
 
 /**
+ * Build multiple tree structures for each root branch
+ * @param {Array} members - Array of family member objects
+ * @returns {Array} Array of tree structures, one for each root
+ */
+export function buildMultipleTrees(members) {
+  const memberMap = createMemberMap(members);
+  const roots = findRoots(members);
+  
+  if (roots.length === 0) {
+    throw new Error('No root nodes found in family tree');
+  }
+
+  // Helper function to build node recursively
+  function buildNode(memberId, visited = new Set()) {
+    if (visited.has(memberId)) {
+      return null; // Prevent cycles
+    }
+    visited.add(memberId);
+
+    const member = memberMap.get(memberId);
+    if (!member) {
+      return null;
+    }
+
+    const node = {
+      data: member,
+      id: member.id,
+      children: []
+    };
+
+    // Add children from relationships
+    if (member.relationships?.children && member.relationships.children.length > 0) {
+      member.relationships.children.forEach(childId => {
+        const childNode = buildNode(childId, new Set(visited));
+        if (childNode) {
+          node.children.push(childNode);
+        }
+      });
+    }
+
+    return node;
+  }
+
+  // Build a tree for each root
+  const trees = [];
+  roots.forEach(rootId => {
+    const tree = buildNode(rootId);
+    if (tree) {
+      trees.push({ rootId, tree });
+    }
+  });
+
+  return trees;
+}
+
+/**
+ * Build D3 hierarchical tree structures from all roots
+ * @param {Array} members - Array of family member objects
+ * @returns {Array} Array of D3 hierarchy roots
+ */
+export function buildAllTreeHierarchies(members) {
+  const trees = buildMultipleTrees(members);
+  return trees.map(({ rootId, tree }) => ({
+    rootId,
+    hierarchy: toD3Hierarchy(tree)
+  }));
+}
+
+/**
  * Get initials from name
  * @param {string} name - Full name
  * @returns {string} Initials
