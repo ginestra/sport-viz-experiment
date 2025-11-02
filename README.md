@@ -1,21 +1,43 @@
-# Women's Football Data Visualizations
+# That Lab
 
-A minimalistic website for interactive data visualizations of women's football players using D3.js and Svelte.
+A collection of interactive experiments exploring data visualization, interactive design, and creative coding. Each experiment is a playground for ideas, techniques, and discoveries.
+
+## Overview
+
+That Lab showcases a variety of data visualizations and interactive experiences built with modern web technologies. The platform features an intuitive navigation system, experiment management with visibility controls, and a beautiful, responsive interface.
 
 ## Features
 
-- **Player Network Visualization**: Interactive radial visualization showing connections between players who played on the same teams
-- **Player Success & Popularity**: Visual representation of trophies, country distribution, and social media popularity
+### Experiments & Visualizations
+
+- **Women's Football Visualizations**: Interactive data visualizations exploring connections between players, their career statistics, and team relationships
+  - Player Network: Radial visualization showing connections between players
+  - Player Success & Popularity: Visual representation of trophies, country distribution, and social media popularity
+
+- **Family Tree**: Interactive family tree visualization with organic, natural branching patterns
+  - Explore family relationships and genealogical connections
+  - Rich data display including dates, places, occupations, and photos
+  - Zoom and pan navigation
+
+### Platform Features
+
+- **Experiment Management**: Tag experiments as public, private, or featured
+  - Private experiments are hidden from searches and listings
+  - Public experiments appear in searches and can be featured
+  - Featured experiments appear prominently on the home page
+
 - **Dark/Light Theme**: System theme detection with manual toggle
 - **Responsive Design**: Mobile-first approach with expandable sidebar menu
-- **Data-driven**: CSV-based data input with support for multiple data sources
+- **About Page**: Learn more about the project
+- **Category Organization**: Browse experiments by category
 
 ## Tech Stack
 
-- **D3.js**: Data manipulation and SVG-based rendering
-- **Svelte**: Reactive UI components
-- **Vite**: Build tool and development server
-- **Font Awesome**: Free icon set (CC BY 4.0)
+- **Svelte 5**: Modern, reactive UI framework
+- **D3.js**: Data manipulation and SVG-based visualization rendering
+- **Vite**: Fast build tool and development server
+- **Svelte SPA Router**: Client-side routing for navigation
+- **Font Awesome**: Icon set (CC BY 4.0)
 
 ## Getting Started
 
@@ -54,8 +76,21 @@ npm run preview
 
 ## Data Files
 
-- `public/data/players.csv`: Player network data (clubs, goals, national teams)
-- `public/data/player-success.csv`: Player success data (trophies, followers, mentions)
+- `public/data/players.csv`: Women's football player network data
+- `public/data/player-success.csv`: Player success and popularity metrics
+- `public/data/family-tree.json`: Family tree data structure (JSON format)
+
+## Experiment Management
+
+Experiments can be tagged with visibility and featured status:
+
+- **Visibility**:
+  - `public`: Visible in searches and category listings
+  - `private`: Hidden from searches and listings (accessible via direct URL)
+
+- **Featured**: Public experiments can be marked as featured to appear on the home page
+
+Configure these in `src/data/experiments.js`.
 
 ## Deployment
 
@@ -74,16 +109,21 @@ Future pushes to the `main` branch will automatically trigger deployments.
 
 ```
 ├── public/
-│   └── data/          # CSV data files
+│   └── data/          # Data files (CSV and JSON)
 ├── src/
 │   ├── components/    # Reusable Svelte components
-│   ├── stores/         # Svelte stores (theme, etc.)
-│   ├── utils/          # Helper functions
+│   ├── data/          # Experiment definitions and metadata
+│   ├── routes/        # Route components (pages)
+│   ├── stores/        # Svelte stores (theme, etc.)
+│   ├── utils/         # Helper functions and utilities
 │   └── visualizations/ # D3.js visualization components
 └── dist/              # Production build output
 ```
 
+## Version
+
+Current version: **1.0.0**
+
 ## Recommended IDE Setup
 
 [VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
-
