@@ -1,11 +1,11 @@
 <script>
   import { link } from 'svelte-spa-router';
-  import { experiments, categories } from '../../data/experiments.js';
+  import { getPublicExperiments, categories } from '../../data/experiments.js';
   
-  // Group experiments by category
+  // Group public experiments by category
   $: experimentsByCategory = categories.map(category => ({
     ...category,
-    experiments: experiments.filter(exp => exp.category === category.id)
+    experiments: getPublicExperiments().filter(exp => exp.category === category.id)
   }));
 </script>
 
@@ -28,10 +28,10 @@
                 <h3 class="item-title">{experiment.title}</h3>
                 <p class="item-description">{experiment.description}</p>
                 <div class="item-tags">
-                  {#each experiment.tags as tag}
-                    <span class="tag">{tag}</span>
-                  {/each}
-                </div>
+              {#each experiment.tags.filter(tag => !['public', 'private', 'featured'].includes(tag)) as tag}
+                <span class="tag">{tag}</span>
+              {/each}
+            </div>
               </a>
             {/each}
           </div>

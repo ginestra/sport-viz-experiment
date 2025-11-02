@@ -2,14 +2,14 @@
   import { link } from 'svelte-spa-router';
   import { getExperimentsByCategory, categories } from '../../../data/experiments.js';
   
-  const categoryId = 'sport-viz';
+  const categoryId = 'interactive';
   $: categoryExperiments = getExperimentsByCategory(categoryId);
   $: category = categories.find(c => c.id === categoryId);
 </script>
 
 <div class="category-page">
-  <h1 class="page-title">{category?.name || 'Sport Visualizations'}</h1>
-  <p class="page-description">{category?.description || 'Data visualizations related to sports'}</p>
+  <h1 class="page-title">{category?.name || 'Interactive Visualizations'}</h1>
+  <p class="page-description">{category?.description || 'Interactive data visualizations and exploratory tools'}</p>
 
   <div class="experiments-grid">
     {#each categoryExperiments as experiment}

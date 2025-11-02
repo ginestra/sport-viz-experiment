@@ -11,6 +11,8 @@
   import ExperimentsIndex from './routes/experiments/Index.svelte';
   import SportVizIndex from './routes/experiments/sport-viz/Index.svelte';
   import WomensFootball from './routes/experiments/sport-viz/womens-football/Index.svelte';
+  import InteractiveIndex from './routes/experiments/interactive/Index.svelte';
+  import FamilyTree from './routes/experiments/interactive/family-tree/Index.svelte';
 
   let menuOpen = false;
 
@@ -21,6 +23,8 @@
     '/experiments': ExperimentsIndex,
     '/experiments/sport-viz': SportVizIndex,
     '/experiments/sport-viz/womens-football': WomensFootball,
+    '/experiments/interactive': InteractiveIndex,
+    '/experiments/interactive/family-tree': FamilyTree,
   };
 
   // Track current location
@@ -59,6 +63,11 @@
     if (route === '/experiments/sport-viz/womens-football') {
       const exp = getExperimentByRoute(route);
       return exp?.title || "Women's Football Visualizations";
+    }
+    if (route === '/experiments/interactive') return 'Interactive Visualizations';
+    if (route === '/experiments/interactive/family-tree') {
+      const exp = getExperimentByRoute(route);
+      return exp?.title || 'Family Tree';
     }
     return 'That Lab';
   }

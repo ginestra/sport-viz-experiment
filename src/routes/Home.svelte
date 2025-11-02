@@ -1,18 +1,24 @@
 <script>
   import { link } from 'svelte-spa-router';
-  import { experiments, categories, searchExperiments } from '../data/experiments.js';
+  import { getPublicExperiments, getFeaturedExperiments, categories, searchExperiments } from '../data/experiments.js';
   
   let searchQuery = '';
   let selectedCategory = 'all';
-  let filteredExperiments = experiments;
+  let filteredExperiments = [];
+  let featuredExperiments = [];
+
+  // Get featured experiments for display
+  $: featuredExperiments = getFeaturedExperiments();
 
   function handleSearch() {
+    // Start with public experiments only
+    let results = getPublicExperiments();
+
+    // If no search or category filter, show all public experiments
     if (!searchQuery.trim() && selectedCategory === 'all') {
-      filteredExperiments = experiments;
+      filteredExperiments = results;
       return;
     }
-
-    let results = experiments;
 
     // Filter by category
     if (selectedCategory !== 'all') {
@@ -41,7 +47,29 @@
     </p>
   </section>
 
+  {#if featuredExperiments.length > 0}
+    <section class="featured-section">
+      <h2 class="section-title">Featured Experiments</h2>
+      <div class="experiments-grid featured-grid">
+        {#each featuredExperiments as experiment}
+          <a href={experiment.route} use:link class="experiment-card featured-card">
+            <div class="featured-badge">Featured</div>
+            <h3 class="card-title">{experiment.title}</h3>
+            <p class="card-description">{experiment.description}</p>
+            <div class="card-tags">
+              {#each experiment.tags.filter(tag => !['public', 'private', 'featured'].includes(tag)) as tag}
+                <span class="tag">{tag}</span>
+              {/each}
+            </div>
+            <div class="card-category">{categories.find(c => c.id === experiment.category)?.name || experiment.category}</div>
+          </a>
+        {/each}
+      </div>
+    </section>
+  {/if}
+
   <section class="experiments-section">
+    <h2 class="section-title">All Experiments</h2>
     <div class="filters-container">
       <div class="search-container">
         <input
@@ -78,7 +106,7 @@
           <h3 class="card-title">{experiment.title}</h3>
           <p class="card-description">{experiment.description}</p>
           <div class="card-tags">
-            {#each experiment.tags as tag}
+            {#each experiment.tags.filter(tag => !['public', 'private', 'featured'].includes(tag)) as tag}
               <span class="tag">{tag}</span>
             {/each}
           </div>
@@ -118,6 +146,41 @@
     color: var(--text-secondary);
     max-width: 600px;
     margin: 0 auto;
+  }
+
+  .featured-section {
+    margin-top: 3rem;
+    margin-bottom: 4rem;
+  }
+
+  .section-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin: 0 0 1.5rem 0;
+    color: var(--text-color);
+  }
+
+  .featured-grid {
+    margin-top: 1rem;
+  }
+
+  .featured-card {
+    position: relative;
+    border: 2px solid var(--primary-color);
+  }
+
+  .featured-badge {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
 
   .experiments-section {
