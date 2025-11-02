@@ -7,6 +7,7 @@
   import { getExperimentByRoute } from './data/experiments.js';
   
   import Home from './routes/Home.svelte';
+  import About from './routes/About.svelte';
   import ExperimentsIndex from './routes/experiments/Index.svelte';
   import SportVizIndex from './routes/experiments/sport-viz/Index.svelte';
   import WomensFootball from './routes/experiments/sport-viz/womens-football/Index.svelte';
@@ -16,6 +17,7 @@
   // Define routes
   const routes = {
     '/': Home,
+    '/about': About,
     '/experiments': ExperimentsIndex,
     '/experiments/sport-viz': SportVizIndex,
     '/experiments/sport-viz/womens-football': WomensFootball,
@@ -30,6 +32,7 @@
   function getMenuItems(route) {
     const items = [
       { label: 'Home', href: '#/' },
+      { label: 'About', href: '#/about' },
       { label: 'Experiments', href: '#/experiments' },
       { label: 'Sport Visualizations', href: '#/experiments/sport-viz' },
     ];
@@ -50,6 +53,7 @@
 
   function getPageTitle(route) {
     if (route === '/') return 'That Lab';
+    if (route === '/about') return 'About';
     if (route === '/experiments') return 'Experiments';
     if (route === '/experiments/sport-viz') return 'Sport Visualizations';
     if (route === '/experiments/sport-viz/womens-football') {
