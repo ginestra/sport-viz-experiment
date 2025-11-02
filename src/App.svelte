@@ -67,7 +67,7 @@
     if (route === '/experiments/interactive') return 'Interactive Visualizations';
     if (route === '/experiments/interactive/family-tree') {
       const exp = getExperimentByRoute(route);
-      return exp?.title || 'Family Tree';
+          return exp?.title || 'Family Forest';
     }
     return 'That Lab';
   }

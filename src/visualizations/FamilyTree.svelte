@@ -62,7 +62,7 @@
       data = familyData.familyMembers;
       loading = false;
     } catch (err) {
-      console.error('Error loading family tree:', err);
+      console.error('Error loading family forest:', err);
       error = err.message || 'Failed to load family data';
       loading = false;
     }
@@ -114,7 +114,7 @@
     const innerWidth = width - margin.left - margin.right;
     const innerHeight = height - margin.top - margin.bottom;
 
-    // Build multiple tree structures
+    // Build multiple tree structures (family forest)
     try {
       const treeHierarchies = buildAllTreeHierarchies(data);
       roots = treeHierarchies.map(th => th.hierarchy);
@@ -142,14 +142,72 @@
           return 1.5; // Increased from 1.2
         });
 
-      // Position each tree side-by-side with improved spacing
-      roots.forEach((root, treeIndex) => {
+      // First, layout all trees - we'll apply generation alignment after
+      roots.forEach((root) => {
         treeLayout(root);
-        applyOrganicPositioning(root, treeWidth);
+        // Don't apply organic positioning to y coordinates since we'll align by generation
+        // Only apply horizontal variation for organic feel
+        root.each(node => {
+          if (node.parent) {
+            const member = node.data.data;
+            const idHash = member.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const variationFactor = 1 + node.depth * 0.1;
+            const variation = ((idHash % 100) - 50) * 0.4 * variationFactor;
+            node.x += variation;
+          }
+        });
         
+        // Apply horizontal spacing enforcement
+        const nodesByDepth = new Map();
+        root.each(node => {
+          if (!nodesByDepth.has(node.depth)) {
+            nodesByDepth.set(node.depth, []);
+          }
+          nodesByDepth.get(node.depth).push(node);
+        });
+        
+        nodesByDepth.forEach((nodes, depth) => {
+          if (nodes.length > 1) {
+            nodes.sort((a, b) => a.x - b.x);
+            const minHorizontalSpacing = 80;
+            for (let i = 1; i < nodes.length; i++) {
+              const prevNode = nodes[i - 1];
+              const currentNode = nodes[i];
+              const currentSpacing = currentNode.x - prevNode.x;
+              if (currentSpacing < minHorizontalSpacing) {
+                const adjustment = minHorizontalSpacing - currentSpacing;
+                currentNode.x += adjustment;
+                for (let j = i + 1; j < nodes.length; j++) {
+                  nodes[j].x += adjustment;
+                }
+              }
+            }
+          }
+        });
+      });
+
+      // Calculate generation-aligned y positions across all trees
+      const generationYPositions = alignNodesByGeneration(roots, innerHeight - 120);
+
+      // Debug: log generation positions
+      console.log('Generation Y Positions:', Array.from(generationYPositions.entries()));
+
+      // Apply generation-aligned positions and horizontal offsets
+      roots.forEach((root, treeIndex) => {
         // Calculate offset: start position + tree index * (tree width + gap)
         const xOffset = startX + treeIndex * (treeWidth + gapBetweenTrees);
+        
         root.each(node => {
+          // Apply generation-aligned y position (roots at bottom)
+          const nodeId = node.data.data.id;
+          const oldY = node.y;
+          if (generationYPositions.has(nodeId)) {
+            node.y = generationYPositions.get(nodeId);
+            console.log(`Node ${nodeId}: ${oldY} -> ${node.y}`);
+          } else {
+            console.warn(`No generation position found for ${nodeId}`);
+          }
+          // Apply horizontal offset
           node.x += xOffset;
         });
       });
@@ -275,22 +333,23 @@
           const distance = Math.sqrt(dx * dx + dy * dy);
           
           // Create a curved path for longer distances (connecting different trees)
+          // Since tree is flipped (roots at bottom), curves should go upward
           if (distance > 100) {
             // Horizontal curve for tree-to-tree connections
             const midX = (d.source.x + d.target.x) / 2;
-            const curveHeight = -Math.min(distance * 0.3, 80);
+            const curveHeight = Math.min(distance * 0.3, 80); // Positive for upward curve
             path.moveTo(d.source.x, d.source.y);
             path.bezierCurveTo(
-              midX, d.source.y + curveHeight,
-              midX, d.target.y + curveHeight,
+              midX, d.source.y - curveHeight,
+              midX, d.target.y - curveHeight,
               d.target.x, d.target.y
             );
           } else {
             // Simple curve for same-tree spouse connections
             const midX = (d.source.x + d.target.x) / 2;
-            const curveHeight = -25;
+            const curveHeight = 25; // Positive for upward curve
             path.moveTo(d.source.x, d.source.y);
-            path.quadraticCurveTo(midX, d.source.y + curveHeight, d.target.x, d.target.y);
+            path.quadraticCurveTo(midX, d.source.y - curveHeight, d.target.x, d.target.y);
           }
           return path.toString();
         })
@@ -443,6 +502,124 @@
       error = err.message;
       return;
     }
+  }
+
+  function alignNodesByGeneration(roots, treeHeight) {
+    // Simplified generation calculation: all trees now have same depth
+    const personGenerations = new Map();
+    const memberMap = new Map();
+    
+    // Validate data is available
+    if (!data || data.length === 0) {
+      console.error('No data available for generation calculation');
+      return new Map();
+    }
+    
+    // Build member map
+    data.forEach(member => {
+      if (member && member.id) {
+        memberMap.set(member.id, member);
+      }
+    });
+    
+    // Step 1: Set all roots (people without parents) to generation 0
+    data.forEach(member => {
+      const parents = member.relationships?.parent || [];
+      if (parents.length === 0) {
+        personGenerations.set(member.id, 0);
+      }
+    });
+    
+    // Step 2: Calculate generations from parents (top-down)
+    // Iterate until all are calculated
+    let changed = true;
+    let iterations = 0;
+    const maxIterations = 20;
+    
+    while (changed && iterations < maxIterations) {
+      changed = false;
+      iterations++;
+      data.forEach(member => {
+        const parents = member.relationships?.parent || [];
+        if (parents.length > 0) {
+          const parentGens = parents.map(pId => personGenerations.get(pId)).filter(g => g !== undefined);
+          if (parentGens.length > 0) {
+            const correctGen = Math.max(...parentGens) + 1;
+            const currentGen = personGenerations.get(member.id);
+            if (currentGen !== correctGen) {
+              personGenerations.set(member.id, correctGen);
+              changed = true;
+            }
+          }
+        }
+      });
+    }
+    
+    // Step 3: Align spouses to same generation
+    changed = true;
+    iterations = 0;
+    while (changed && iterations < maxIterations) {
+      changed = false;
+      iterations++;
+      data.forEach(member => {
+        if (member.relationships?.spouse && member.relationships.spouse.length > 0) {
+          const memberGen = personGenerations.get(member.id);
+          if (memberGen !== undefined) {
+            member.relationships.spouse.forEach(spouseId => {
+              const spouseGen = personGenerations.get(spouseId);
+              if (spouseGen === undefined || spouseGen !== memberGen) {
+                personGenerations.set(spouseId, memberGen);
+                changed = true;
+              }
+            });
+          }
+        }
+      });
+    }
+    
+    // Group nodes by generation
+    const nodesByGeneration = new Map();
+    personGenerations.forEach((generation, nodeId) => {
+      if (!nodesByGeneration.has(generation)) {
+        nodesByGeneration.set(generation, []);
+      }
+      nodesByGeneration.get(generation).push(nodeId);
+    });
+    
+    // Calculate y positions for each generation
+    // Roots (generation 0) at bottom, newer generations higher up
+    const maxGeneration = Math.max(...Array.from(nodesByGeneration.keys()), 0);
+    const generationYPositions = new Map();
+    
+    // Calculate spacing - more space near roots (older generations)
+    const minSpacing = 100; // Minimum spacing
+    const maxSpacing = 150; // Maximum spacing for oldest generations
+    
+    // Work from oldest (generation 0) to newest (maxGeneration)
+    // Start from bottom (high y value) and work upward (decreasing y)
+    // In SVG: y=0 is top, y=treeHeight is bottom
+    // We want: generation 0 (Adele) at bottom, generation 1 (grandparents) above, generation 2 (parents) at top
+    
+    let currentY = treeHeight; // Start at bottom
+    
+    for (let gen = 0; gen <= maxGeneration; gen++) {
+      if (nodesByGeneration.has(gen)) {
+        // Set y position for all nodes in this generation
+        // Generation 0 at bottom, higher generations moving up (decreasing y)
+        nodesByGeneration.get(gen).forEach(nodeId => {
+          generationYPositions.set(nodeId, currentY);
+        });
+        
+        // Calculate spacing for next generation (more space for older generations)
+        if (gen < maxGeneration) {
+          const spacingRatio = 1 - (gen / maxGeneration) * 0.3; // Decrease spacing by up to 30% as we go up
+          const spacing = minSpacing + (maxSpacing - minSpacing) * spacingRatio;
+          currentY -= spacing; // Move up (decrease y) for next generation
+        }
+      }
+    }
+    
+    return generationYPositions;
   }
 
   function applyOrganicPositioning(root, width) {
@@ -626,13 +803,13 @@
 
 <div class="family-tree-container">
   {#if loading}
-    <div class="loading">Loading family tree...</div>
+    <div class="loading">Loading family forest...</div>
   {:else if error}
     <div class="error">Error: {error}</div>
   {:else}
     <div class="visualization-header">
-      <h2>Family Tree</h2>
-      <p>Interactive family tree visualization. Hover over nodes for details, click to select, zoom and pan to explore.</p>
+      <h2>Family Forest</h2>
+      <p>Interactive family forest visualization. Roots at the bottom, branches grow toward the sky. Hover over nodes for details, click to select, zoom and pan to explore.</p>
       <button class="reset-btn" on:click={() => {
         if (svg && zoom && allNodes.length > 0 && container) {
           const bounds = getTreeBounds();

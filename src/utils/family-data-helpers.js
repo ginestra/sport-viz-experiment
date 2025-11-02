@@ -1,7 +1,7 @@
 import * as d3 from 'd3';
 
 /**
- * Load and parse family tree JSON data
+ * Load and parse family forest JSON data
  * @param {string} url - URL to JSON file
  * @returns {Promise<Object>} Parsed JSON data
  */
@@ -56,7 +56,7 @@ export function buildTreeStructure(members, rootId = null) {
   if (!rootId) {
     const roots = findRoots(members);
     if (roots.length === 0) {
-      throw new Error('No root node found in family tree');
+      throw new Error('No root node found in family forest');
     }
     // Use first root, or handle multiple roots
     rootId = roots[0];
@@ -214,7 +214,7 @@ export function buildMultipleTrees(members) {
   const roots = findRoots(members);
   
   if (roots.length === 0) {
-    throw new Error('No root nodes found in family tree');
+    throw new Error('No root nodes found in family forest');
   }
 
   // Helper function to build node recursively

@@ -4,12 +4,12 @@
 
 <div class="family-tree-page">
   <section class="intro-section">
-    <h2 class="section-title">Family Tree</h2>
-    <p class="section-description">
-      An interactive visualization exploring family relationships and genealogical connections.
-      Navigate through your family tree with organic, natural branching patterns. Hover over nodes for quick information,
-      click to view detailed profiles, and zoom/pan to explore.
-    </p>
+        <h2 class="section-title">Family Forest</h2>
+        <p class="section-description">
+          An interactive visualization exploring family relationships and genealogical connections.
+          Navigate through your family forest with roots at the bottom and branches growing upward, like a natural tree.
+          Hover over nodes for quick information, click to view detailed profiles, and zoom/pan to explore.
+        </p>
   </section>
 
   <section class="content-section">

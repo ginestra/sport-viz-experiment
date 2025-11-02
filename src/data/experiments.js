@@ -15,7 +15,7 @@ export const experiments = [
   },
   {
     id: 'family-tree',
-    title: 'Family Tree',
+    title: 'Family Forest',
     category: 'interactive',
     description: 'An interactive visualization exploring family relationships and genealogical connections.',
     tags: ['family', 'genealogy', 'tree', 'interactive'],
