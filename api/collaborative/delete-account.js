@@ -16,8 +16,10 @@ export default async function handler(req, res) {
     const token = authHeader.substring(7);
 
     // Initialize Supabase client with anon key for token verification
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    // Note: In Vercel serverless functions, use environment variables without VITE_ prefix
+    // VITE_ prefix is only for client-side variables that get bundled
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
     
     if (!supabaseUrl || !supabaseAnonKey) {
       return res.status(500).json({ error: 'Server configuration error' });
