@@ -35,7 +35,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key-here
 
 #### For Serverless Functions (No VITE_ prefix)
 
-These variables are only available server-side:
+These variables are only available server-side and are **NEVER** exposed to the client:
 
 ```
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
@@ -45,6 +45,13 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key-here
 - Go to your Supabase project dashboard
 - Navigate to **Settings** → **API**
 - Copy the **service_role key** (⚠️ Keep this secret!)
+
+**🔒 Security Note:** 
+- Variables **WITHOUT** the `VITE_` prefix are **NOT** bundled into client-side JavaScript
+- They are **ONLY** available to serverless functions via `process.env`
+- The service role key will **NEVER** appear in your client-side bundle
+- Vercel encrypts all environment variables at rest
+- ✅ **Safe to add to Vercel** - it's server-side only
 
 ### Setting Environment Variables
 
@@ -62,7 +69,11 @@ For each variable:
 ### Important Notes
 
 - **VITE_ prefix**: Variables starting with `VITE_` are exposed to the client-side bundle. This is intentional and safe for Supabase anon keys (they're protected by RLS).
-- **Service Role Key**: Never use `VITE_` prefix for `SUPABASE_SERVICE_ROLE_KEY` - it should only be available server-side.
+- **Service Role Key**: 
+  - ✅ **DO add** `SUPABASE_SERVICE_ROLE_KEY` to Vercel (without `VITE_` prefix)
+  - ✅ It's **safe** because it's only available server-side (serverless functions)
+  - ❌ **NEVER** use `VITE_` prefix for `SUPABASE_SERVICE_ROLE_KEY` - that would expose it to the client
+  - The key will **NOT** appear in your client-side JavaScript bundle
 - **After adding variables**: You need to **redeploy** your application for changes to take effect.
 
 ## Step 2: Redeploy After Adding Variables
@@ -125,9 +136,12 @@ After redeploying:
 ## Security Reminders
 
 - ✅ `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are safe to expose (protected by RLS)
-- ❌ Never expose `SUPABASE_SERVICE_ROLE_KEY` to the client
+- ✅ `SUPABASE_SERVICE_ROLE_KEY` should be added to Vercel (without `VITE_` prefix)
+- ✅ Service role key is **automatically protected** - variables without `VITE_` prefix are server-side only
 - ✅ Service role key is only used in serverless functions (`api/collaborative/delete-account.js`)
+- ✅ The service role key will **NEVER** appear in your client-side JavaScript bundle
 - ✅ All environment variables in Vercel are encrypted at rest
+- ❌ **NEVER** add `VITE_` prefix to `SUPABASE_SERVICE_ROLE_KEY` - that would expose it to the client
 
 ## Quick Setup Checklist
 
