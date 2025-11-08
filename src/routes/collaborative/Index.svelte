@@ -35,8 +35,18 @@
   }
 
   async function handleSignOut() {
-    await auth.signOut();
-    window.location.hash = '/';
+    try {
+      const { error } = await auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+      }
+      // Redirect after sign out (stores are cleared in auth.signOut)
+      window.location.hash = '/';
+    } catch (err) {
+      console.error('Error signing out:', err);
+      // Still redirect on error
+      window.location.hash = '/';
+    }
   }
 
   onMount(async () => {

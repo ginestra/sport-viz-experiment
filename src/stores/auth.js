@@ -55,8 +55,22 @@ export const auth = {
   },
 
   async signOut() {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    try {
+      const { error } = await supabase.auth.signOut();
+      // Explicitly clear stores on sign out
+      if (!error) {
+        sessionStore.set(null);
+        user.set(null);
+        loading.set(false);
+      }
+      return { error };
+    } catch (err) {
+      // Even if there's an error, clear the stores
+      sessionStore.set(null);
+      user.set(null);
+      loading.set(false);
+      return { error: err };
+    }
   },
 
   async resetPassword(email) {
