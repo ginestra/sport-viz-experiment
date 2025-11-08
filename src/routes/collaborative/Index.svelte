@@ -40,12 +40,18 @@
       if (error) {
         console.error('Error signing out:', error);
       }
-      // Redirect after sign out (stores are cleared in auth.signOut)
-      window.location.hash = '/';
+      // Reload threads to show unauthenticated state
+      // Clear local state
+      isModerator = false;
+      isBlocked = false;
+      // Reload threads (will show public view)
+      await loadThreads();
     } catch (err) {
       console.error('Error signing out:', err);
-      // Still redirect on error
-      window.location.hash = '/';
+      // Still clear local state and reload
+      isModerator = false;
+      isBlocked = false;
+      await loadThreads();
     }
   }
 

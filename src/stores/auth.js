@@ -56,16 +56,24 @@ export const auth = {
 
   async signOut() {
     try {
+      // Clear stores first to provide immediate feedback
+      sessionStore.set(null);
+      user.set(null);
+      loading.set(false);
+      
+      // Then sign out from Supabase
       const { error } = await supabase.auth.signOut();
-      // Explicitly clear stores on sign out
-      if (!error) {
+      
+      // Ensure stores are cleared even if there's an error
+      if (error) {
         sessionStore.set(null);
         user.set(null);
         loading.set(false);
       }
+      
       return { error };
     } catch (err) {
-      // Even if there's an error, clear the stores
+      // Even if there's an error, ensure stores are cleared
       sessionStore.set(null);
       user.set(null);
       loading.set(false);
