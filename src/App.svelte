@@ -13,6 +13,15 @@
   import WomensFootball from './routes/experiments/sport-viz/womens-football/Index.svelte';
   import InteractiveIndex from './routes/experiments/interactive/Index.svelte';
   import FamilyTree from './routes/experiments/interactive/family-tree/Index.svelte';
+  import CollaborativeIndex from './routes/collaborative/Index.svelte';
+  import CollaborativeLogin from './routes/collaborative/Login.svelte';
+  import CollaborativeRegister from './routes/collaborative/Register.svelte';
+  import CollaborativeCreateThread from './routes/collaborative/CreateThread.svelte';
+  import CollaborativeAccountSettings from './routes/collaborative/AccountSettings.svelte';
+  import CollaborativeModeration from './routes/collaborative/Moderation.svelte';
+  import CollaborativeThread from './routes/collaborative/Thread.svelte';
+  import Privacy from './routes/Privacy.svelte';
+  import Terms from './routes/Terms.svelte';
 
   let menuOpen = false;
 
@@ -25,6 +34,15 @@
     '/experiments/sport-viz/womens-football': WomensFootball,
     '/experiments/interactive': InteractiveIndex,
     '/experiments/interactive/family-tree': FamilyTree,
+    '/collaborative': CollaborativeIndex,
+    '/collaborative/login': CollaborativeLogin,
+    '/collaborative/register': CollaborativeRegister,
+    '/collaborative/create': CollaborativeCreateThread,
+    '/collaborative/settings': CollaborativeAccountSettings,
+    '/collaborative/moderation': CollaborativeModeration,
+    '/collaborative/thread/:id': CollaborativeThread,
+    '/privacy': Privacy,
+    '/terms': Terms,
   };
 
   // Track current location
@@ -39,6 +57,7 @@
       { label: 'About', href: '#/about' },
       { label: 'Experiments', href: '#/experiments' },
       { label: 'Sport Visualizations', href: '#/experiments/sport-viz' },
+      { label: 'Collaborative Writing', href: '#/collaborative' },
     ];
 
     // If on womens-football route, add visualization links
@@ -69,6 +88,17 @@
       const exp = getExperimentByRoute(route);
           return exp?.title || 'Family Forest';
     }
+    if (route.startsWith('/collaborative')) {
+      if (route === '/collaborative/login') return 'Sign In - Collaborative Writing';
+      if (route === '/collaborative/register') return 'Sign Up - Collaborative Writing';
+      if (route === '/collaborative/create') return 'Create Thread - Collaborative Writing';
+      if (route === '/collaborative/settings') return 'Account Settings - Collaborative Writing';
+      if (route === '/collaborative/moderation') return 'Moderation Panel - Collaborative Writing';
+      if (route.startsWith('/collaborative/thread/')) return 'Thread - Collaborative Writing';
+      return 'Collaborative Writing';
+    }
+    if (route === '/privacy') return 'Privacy Policy';
+    if (route === '/terms') return 'Terms of Service';
     return 'That Lab';
   }
 
@@ -98,7 +128,7 @@
     </header>
 
     <div class="router-container">
-      <Router {routes} />
+      <Router routes={routes} />
     </div>
   </main>
 </div>
