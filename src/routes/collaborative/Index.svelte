@@ -56,14 +56,8 @@
   }
 
   onMount(async () => {
-    // Handle OAuth callback - ensure session is processed from URL
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
-      // Session exists, ensure it's set in store
-      user.set(session.user);
-    }
-
     // Wait for auth to be ready (especially after OAuth redirect)
+    // Don't manually restore sessions - let the auth store handle it
     const waitForAuth = () => {
       return new Promise((resolve) => {
         // If auth is already loaded, resolve immediately

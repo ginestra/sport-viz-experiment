@@ -61,11 +61,28 @@ export const auth = {
       user.set(null);
       loading.set(false);
       
-      // Then sign out from Supabase
+      // Sign out from Supabase (this clears the persisted session in localStorage)
       const { error } = await supabase.auth.signOut();
       
-      // Ensure stores are cleared even if there's an error
-      if (error) {
+      // Ensure stores remain cleared even if there's an error
+      // Also clear any remaining session data
+      sessionStore.set(null);
+      user.set(null);
+      loading.set(false);
+      
+      // Double-check: verify session is actually cleared
+      const { data: { session: remainingSession } } = await supabase.auth.getSession();
+      if (remainingSession) {
+        console.warn('Session still exists after signOut, forcing clear');
+        // Force clear by removing from localStorage
+        if (typeof window !== 'undefined' && window.localStorage) {
+          const keys = Object.keys(window.localStorage);
+          keys.forEach(key => {
+            if (key.includes('supabase') || key.includes('auth')) {
+              window.localStorage.removeItem(key);
+            }
+          });
+        }
         sessionStore.set(null);
         user.set(null);
         loading.set(false);

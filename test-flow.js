@@ -509,6 +509,54 @@ async function testFlow() {
     console.log(`   Post 2: User ${postsList[1].user_id.substring(0, 8)}... (order: ${postsList[1].post_order})`);
   }) && allPassed;
 
+  // Test 13: Sign Out
+  allPassed = await testStep('User 1 Signs Out', async () => {
+    await signOut();
+    // Verify session is cleared
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      throw new Error('Session still exists after sign out');
+    }
+    console.log('   Session cleared successfully');
+  }) && allPassed;
+
+  // Test 14: Verify unauthenticated access to threads
+  allPassed = await testStep('Unauthenticated Access After Sign Out', async () => {
+    // Try to access threads (should work without auth - public read)
+    const { data, error } = await supabase
+      .from('writing_threads')
+      .select('id')
+      .limit(1);
+    
+    if (error && error.message.includes('JWT')) {
+      throw new Error('Unauthenticated users should be able to read threads');
+    }
+    console.log('   Unauthenticated access works correctly');
+  }) && allPassed;
+
+  // Test 15: Verify cannot post without authentication
+  allPassed = await testStep('Cannot Post Without Authentication', async () => {
+    if (!testThreadId) {
+      throw new Error('No test thread available');
+    }
+    
+    // Try to create a post without being signed in (should fail)
+    const { error } = await supabase
+      .from('thread_posts')
+      .insert({
+        thread_id: testThreadId,
+        user_id: user1Session.user.id, // Using old user ID
+        content: 'This should fail',
+        post_order: 999
+      });
+    
+    // Should fail with authentication error
+    if (!error) {
+      throw new Error('Post creation should fail when not authenticated');
+    }
+    console.log('   Post creation correctly blocked for unauthenticated user');
+  }) && allPassed;
+
   // Cleanup
   console.log('\n🧹 Cleaning up test data...');
   try {
