@@ -1,8 +1,11 @@
 /**
  * Posts API - Centralized post database operations
+ * 
+ * @module api/posts
  */
 
 import { supabase } from '../supabase/client.js';
+import { handleApiError, logError, ERROR_CODES } from '../utils/errors.js';
 
 /**
  * Get posts for a thread
@@ -36,14 +39,8 @@ export async function getPosts(threadId, options = {}) {
 
     return { data: posts, error: null };
   } catch (err) {
-    console.error('Error loading posts:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to load posts',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'getPosts', { threadId });
+    return handleApiError({ error: err }, 'getPosts');
   }
 }
 
@@ -56,7 +53,7 @@ export async function createPost(postData) {
   if (!postData.thread_id || !postData.user_id || !postData.content) {
     return {
       data: null,
-      error: { message: 'thread_id, user_id, and content are required', code: 'MISSING_FIELDS' }
+      error: { message: 'thread_id, user_id, and content are required', code: ERROR_CODES.MISSING_FIELDS }
     };
   }
 
@@ -78,14 +75,8 @@ export async function createPost(postData) {
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error creating post:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to create post',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'createPost', { threadId: postData.thread_id, userId: postData.user_id });
+    return handleApiError({ error: err }, 'createPost');
   }
 }
 
@@ -99,7 +90,7 @@ export async function updatePost(postId, updates) {
   if (!postId) {
     return {
       data: null,
-      error: { message: 'Post ID is required', code: 'MISSING_ID' }
+      error: { message: 'Post ID is required', code: ERROR_CODES.MISSING_ID }
     };
   }
 
@@ -115,14 +106,8 @@ export async function updatePost(postId, updates) {
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error updating post:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to update post',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'updatePost', { postId });
+    return handleApiError({ error: err }, 'updatePost');
   }
 }
 
@@ -144,7 +129,7 @@ export async function getPost(postId) {
   if (!postId) {
     return {
       data: null,
-      error: { message: 'Post ID is required', code: 'MISSING_ID' }
+      error: { message: 'Post ID is required', code: ERROR_CODES.MISSING_ID }
     };
   }
 
@@ -157,21 +142,15 @@ export async function getPost(postId) {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return { data: null, error: { message: 'Post not found', code: 'NOT_FOUND' } };
+        return { data: null, error: { message: 'Post not found', code: ERROR_CODES.NOT_FOUND } };
       }
       throw error;
     }
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error loading post:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to load post',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'getPost', { postId });
+    return handleApiError({ error: err }, 'getPost');
   }
 }
 

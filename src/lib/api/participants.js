@@ -1,8 +1,11 @@
 /**
  * Participants API - Centralized participant database operations
+ * 
+ * @module api/participants
  */
 
 import { supabase } from '../supabase/client.js';
+import { handleApiError, logError, ERROR_CODES } from '../utils/errors.js';
 
 /**
  * Get participants for a thread
@@ -13,7 +16,7 @@ export async function getParticipants(threadId) {
   if (!threadId) {
     return {
       data: null,
-      error: { message: 'Thread ID is required', code: 'MISSING_ID' }
+      error: { message: 'Thread ID is required', code: ERROR_CODES.MISSING_ID }
     };
   }
 
@@ -28,14 +31,8 @@ export async function getParticipants(threadId) {
 
     return { data: data || [], error: null };
   } catch (err) {
-    console.error('Error loading participants:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to load participants',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'getParticipants', { threadId });
+    return handleApiError({ error: err }, 'getParticipants');
   }
 }
 
@@ -49,7 +46,7 @@ export async function joinThread(threadId, userId) {
   if (!threadId || !userId) {
     return {
       data: null,
-      error: { message: 'Thread ID and User ID are required', code: 'MISSING_FIELDS' }
+      error: { message: 'Thread ID and User ID are required', code: ERROR_CODES.MISSING_FIELDS }
     };
   }
 
@@ -96,7 +93,7 @@ export async function joinThread(threadId, userId) {
       if (error.code === '23505' || error.message.includes('duplicate')) {
         return {
           data: null,
-          error: { message: 'You are already a participant in this thread', code: 'ALREADY_JOINED' }
+          error: { message: 'You are already a participant in this thread', code: ERROR_CODES.ALREADY_JOINED }
         };
       }
       throw error;
@@ -104,14 +101,8 @@ export async function joinThread(threadId, userId) {
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error joining thread:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to join thread',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'joinThread', { threadId, userId });
+    return handleApiError({ error: err }, 'joinThread');
   }
 }
 
@@ -125,7 +116,7 @@ export async function updateParticipantTurnOrder(participantId, turnOrder) {
   if (!participantId || turnOrder === undefined || turnOrder === null) {
     return {
       data: null,
-      error: { message: 'Participant ID and turn order are required', code: 'MISSING_FIELDS' }
+      error: { message: 'Participant ID and turn order are required', code: ERROR_CODES.MISSING_FIELDS }
     };
   }
 
@@ -141,14 +132,8 @@ export async function updateParticipantTurnOrder(participantId, turnOrder) {
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error updating participant turn order:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to update turn order',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'updateParticipantTurnOrder', { participantId, turnOrder });
+    return handleApiError({ error: err }, 'updateParticipantTurnOrder');
   }
 }
 
@@ -194,7 +179,7 @@ export async function fixParticipantTurnOrders(threadId, participants) {
       data: participants,
       error: {
         message: err.message || 'Failed to fix turn orders',
-        code: err.code || 'UNKNOWN_ERROR'
+        code: ERROR_CODES.UNKNOWN_ERROR
       }
     };
   }
@@ -210,7 +195,7 @@ export async function getParticipant(threadId, userId) {
   if (!threadId || !userId) {
     return {
       data: null,
-      error: { message: 'Thread ID and User ID are required', code: 'MISSING_FIELDS' }
+      error: { message: 'Thread ID and User ID are required', code: ERROR_CODES.MISSING_FIELDS }
     };
   }
 
@@ -231,14 +216,8 @@ export async function getParticipant(threadId, userId) {
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error loading participant:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to load participant',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'getParticipant', { threadId, userId });
+    return handleApiError({ error: err }, 'getParticipant');
   }
 }
 

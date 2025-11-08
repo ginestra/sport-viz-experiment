@@ -4,15 +4,32 @@
 
   /**
    * ThreadHeader - Displays thread header and metadata
-   * @prop {Object} thread - Thread object
-   * @prop {Array} participants - Array of participant objects
-   * @prop {Object} participantProfiles - Map of user_id -> display_name
-   * @prop {string} currentUserId - Current user ID (for "You" display)
+   * 
+   * @component
+   * @prop {Object} thread - Thread object (required)
+   * @prop {Array<Object>} [participants=[]] - Array of participant objects
+   * @prop {Object<string, string>} [participantProfiles={}] - Map of user_id -> display_name
+   * @prop {string|null} [currentUserId=null] - Current user ID (for "You" display)
    */
   export let thread;
   export let participants = [];
   export let participantProfiles = {};
   export let currentUserId = null;
+
+  // Prop validation
+  $: if (!thread || typeof thread !== 'object') {
+    console.error('ThreadHeader: thread prop is required and must be an object');
+  }
+
+  $: if (!Array.isArray(participants)) {
+    console.warn('ThreadHeader: participants must be an array, got:', typeof participants);
+    participants = [];
+  }
+
+  $: if (participantProfiles && typeof participantProfiles !== 'object') {
+    console.warn('ThreadHeader: participantProfiles must be an object, got:', typeof participantProfiles);
+    participantProfiles = {};
+  }
 </script>
 
 <div class="thread-header-section">

@@ -1,13 +1,30 @@
 <script>
   /**
    * ViewModeToggle - Toggle between Write Mode and Read Mode
+   * 
+   * @component
    * @prop {string} viewMode - Current view mode ('write' | 'read')
-   * @prop {function} onModeChange - Callback when mode changes
-   * @prop {number} postsCount - Number of posts (only show if > 0)
+   * @prop {function} onModeChange - Callback when mode changes (mode: string) => void
+   * @prop {number} [postsCount=0] - Number of posts (only show if > 0)
    */
   export let viewMode = 'write';
   export let onModeChange;
   export let postsCount = 0;
+
+  // Prop validation
+  $: if (viewMode !== 'write' && viewMode !== 'read') {
+    console.warn('ViewModeToggle: viewMode must be "write" or "read", got:', viewMode);
+    viewMode = 'write';
+  }
+
+  $: if (typeof onModeChange !== 'function') {
+    console.warn('ViewModeToggle: onModeChange must be a function');
+  }
+
+  $: if (typeof postsCount !== 'number' || postsCount < 0) {
+    console.warn('ViewModeToggle: postsCount must be a non-negative number, got:', postsCount);
+    postsCount = 0;
+  }
 </script>
 
 {#if postsCount > 0}

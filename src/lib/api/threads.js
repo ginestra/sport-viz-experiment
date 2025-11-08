@@ -1,13 +1,23 @@
 /**
  * Thread API - Centralized thread database operations
+ * 
+ * @module api/threads
  */
 
 import { supabase } from '../supabase/client.js';
 import { THREAD_STATUS } from '../constants/collaborative.js';
+import { handleApiError, logError, ERROR_CODES } from '../utils/errors.js';
 
 /**
  * Get all threads
- * @returns {Promise<{data: Array, error: Error|null}>}
+ * @returns {Promise<{data: Array<Object>|null, error: {message: string, code: string}|null}>}
+ * @example
+ * const { data, error } = await getThreads();
+ * if (error) {
+ *   console.error('Failed to load threads:', error.message);
+ * } else {
+ *   console.log('Loaded threads:', data);
+ * }
  */
 export async function getThreads() {
   try {
@@ -26,7 +36,7 @@ export async function getThreads() {
           data: null,
           error: {
             message: 'Database not set up yet. Please run the SQL schema from SUPABASE_SCHEMA.md in your Supabase SQL Editor.',
-            code: 'SCHEMA_NOT_FOUND'
+            code: ERROR_CODES.SCHEMA_NOT_FOUND
           }
         };
       }
@@ -35,27 +45,28 @@ export async function getThreads() {
 
     return { data: data || [], error: null };
   } catch (err) {
-    console.error('Error loading threads:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to load threads',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'getThreads');
+    return handleApiError({ error: err }, 'getThreads');
   }
 }
 
 /**
  * Get a single thread by ID
  * @param {string} threadId - Thread UUID
- * @returns {Promise<{data: Object|null, error: Error|null}>}
+ * @returns {Promise<{data: Object|null, error: {message: string, code: string}|null}>}
+ * @example
+ * const { data, error } = await getThread('thread-uuid');
+ * if (error) {
+ *   if (error.code === 'NOT_FOUND') {
+ *     console.log('Thread does not exist');
+ *   }
+ * }
  */
 export async function getThread(threadId) {
   if (!threadId) {
     return {
       data: null,
-      error: { message: 'Thread ID is required', code: 'MISSING_ID' }
+      error: { message: 'Thread ID is required', code: ERROR_CODES.MISSING_ID }
     };
   }
 
@@ -69,34 +80,39 @@ export async function getThread(threadId) {
     if (error) {
       if (error.code === 'PGRST116') {
         // No rows returned
-        return { data: null, error: { message: 'Thread not found', code: 'NOT_FOUND' } };
+        return { data: null, error: { message: 'Thread not found', code: ERROR_CODES.NOT_FOUND } };
       }
       throw error;
     }
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error loading thread:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to load thread',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'getThread', { threadId });
+    return handleApiError({ error: err }, 'getThread');
   }
 }
 
 /**
  * Create a new thread
- * @param {Object} threadData - Thread data (theme, min_participants, max_participants, created_by)
- * @returns {Promise<{data: Object|null, error: Error|null}>}
+ * @param {Object} threadData - Thread data
+ * @param {string} threadData.theme - Thread theme/topic
+ * @param {number} [threadData.min_participants=2] - Minimum participants required
+ * @param {number} [threadData.max_participants=5] - Maximum participants allowed
+ * @param {string} threadData.created_by - User ID of thread creator
+ * @returns {Promise<{data: Object|null, error: {message: string, code: string}|null}>}
+ * @example
+ * const { data, error } = await createThread({
+ *   theme: 'Climate Change Solutions',
+ *   min_participants: 3,
+ *   max_participants: 10,
+ *   created_by: 'user-uuid'
+ * });
  */
 export async function createThread(threadData) {
   if (!threadData.theme || !threadData.created_by) {
     return {
       data: null,
-      error: { message: 'Theme and created_by are required', code: 'MISSING_FIELDS' }
+      error: { message: 'Theme and created_by are required', code: ERROR_CODES.MISSING_FIELDS }
     };
   }
 
@@ -117,14 +133,8 @@ export async function createThread(threadData) {
 
     return { data, error: null };
   } catch (err) {
-    console.error('Error creating thread:', err);
-    return {
-      data: null,
-      error: {
-        message: err.message || 'Failed to create thread',
-        code: err.code || 'UNKNOWN_ERROR'
-      }
-    };
+    logError(err, 'createThread', { threadData });
+    return handleApiError({ error: err }, 'createThread');
   }
 }
 
