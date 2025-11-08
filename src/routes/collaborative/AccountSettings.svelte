@@ -3,6 +3,7 @@
   import { user, auth } from '../../stores/auth.js';
   import { link } from 'svelte-spa-router';
   import { supabase } from '../../lib/supabase/client.js';
+  import { loadProfile } from '../../lib/api/profiles.js';
 
   let loading = false;
   let error = '';
@@ -14,20 +15,13 @@
   let displayNameLoading = false;
   let profileLoaded = false;
 
-  async function loadProfile() {
+  async function loadUserProfile() {
     if (!$user?.id) return;
 
     try {
-      const { data, error: profileError } = await supabase
-        .from('user_profiles')
-        .select('display_name')
-        .eq('user_id', $user.id)
-        .single();
-
-      if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('Error loading profile:', profileError);
-      } else if (data) {
-        displayName = data.display_name || '';
+      const profile = await loadProfile($user.id);
+      if (profile) {
+        displayName = profile.display_name || '';
       }
       profileLoaded = true;
     } catch (err) {
@@ -99,7 +93,7 @@
   }
 
   onMount(() => {
-    loadProfile();
+    loadUserProfile();
   });
 
   async function exportUserData() {

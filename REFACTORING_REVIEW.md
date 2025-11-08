@@ -179,17 +179,24 @@ function handleError(error, context) {
 
 ## 📋 Refactoring Checklist
 
-### Phase 1: Quick Wins (High Impact, Low Effort)
-- [ ] Remove duplicate `getWordCount` function
-- [ ] Use `sanitizeSource` from utils
-- [ ] Extract color generation to utility
-- [ ] Extract constants
+### Phase 1: Quick Wins (High Impact, Low Effort) ✅ COMPLETED
+- [x] Remove duplicate `getWordCount` function
+- [x] Use `sanitizeSource` from utils
+- [x] Extract color generation to utility
+- [x] Extract constants
+- [x] Remove debug console logs
+- [x] Use status constants throughout
+- [x] Extract profile loading utility
+- [x] Extract URL parameter utility
 
-### Phase 2: Component Splitting (Medium Effort)
-- [ ] Split `Thread.svelte` into smaller components
-- [ ] Extract `ReadView` component
-- [ ] Extract `PostListView` component
-- [ ] Extract `ThreadHeader` component
+### Phase 2: Component Splitting (Medium Effort) ✅ COMPLETED
+- [x] Split `Thread.svelte` into smaller components
+- [x] Extract `ViewModeToggle` component
+- [x] Extract `ReadView` component
+- [x] Extract `PostListView` component
+- [x] Extract `ThreadHeader` component
+- [x] Extract `ThreadControls` component
+- [x] Refactor `Thread.svelte` to use new components
 
 ### Phase 3: API Layer (Higher Effort)
 - [ ] Create `threads.js` API module

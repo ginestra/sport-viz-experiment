@@ -4,6 +4,7 @@
   import { link } from 'svelte-spa-router';
   import { supabase } from '../../lib/supabase/client.js';
   import { isModeratorOrAdmin } from '../../lib/moderation/roles.js';
+  import { ensureProfile } from '../../lib/api/profiles.js';
   import UserWarningBanner from '../../components/collaborative/UserWarningBanner.svelte';
   import BlockedUserBanner from '../../components/collaborative/BlockedUserBanner.svelte';
   import { isUserBlocked } from '../../lib/moderation/blocks.js';
@@ -91,23 +92,8 @@
       isModerator = await isModeratorOrAdmin();
       isBlocked = await isUserBlocked($user.id);
       
-      // Check if user has a profile (for OAuth users who might not have one)
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('user_id', $user.id)
-        .single();
-      
-      // If no profile exists, create one with email as default display name
-      if (!profile && $user.email) {
-        const defaultName = $user.email.split('@')[0]; // Use email username as default
-        await supabase
-          .from('user_profiles')
-          .insert({
-            user_id: $user.id,
-            display_name: defaultName
-          });
-      }
+      // Ensure user has a profile (for OAuth users who might not have one)
+      await ensureProfile($user.id, $user.email);
     }
     
     loadThreads();
