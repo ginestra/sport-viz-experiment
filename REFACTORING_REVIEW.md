@@ -198,12 +198,14 @@ function handleError(error, context) {
 - [x] Extract `ThreadControls` component
 - [x] Refactor `Thread.svelte` to use new components
 
-### Phase 3: API Layer (Higher Effort)
-- [ ] Create `threads.js` API module
-- [ ] Create `posts.js` API module
-- [ ] Create `participants.js` API module
-- [ ] Create `profiles.js` API module
-- [ ] Refactor components to use API layer
+### Phase 3: API Layer (Higher Effort) ✅ COMPLETED
+- [x] Create `threads.js` API module
+- [x] Create `posts.js` API module
+- [x] Create `participants.js` API module
+- [x] Create `profiles.js` API module (already existed, enhanced)
+- [x] Refactor `Index.svelte` to use threads API
+- [x] Refactor `Thread.svelte` to use API modules
+- [x] Refactor `CreateThread.svelte` to use threads API
 
 ### Phase 4: Polish (Ongoing)
 - [ ] Standardize error handling

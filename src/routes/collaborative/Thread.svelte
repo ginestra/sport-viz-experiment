@@ -2,12 +2,14 @@
   import { onMount, onDestroy } from 'svelte';
   import { user } from '../../stores/auth.js';
   import { link } from 'svelte-spa-router';
-  import { supabase } from '../../lib/supabase/client.js';
   import { isUserBlocked } from '../../lib/moderation/blocks.js';
   import { getWordCount, sanitizeSource } from '../../lib/utils/sanitize.js';
   import { MAX_WORDS, THREAD_STATUS } from '../../lib/constants/collaborative.js';
   import { extractThreadId } from '../../lib/utils/router.js';
   import { loadProfiles } from '../../lib/api/profiles.js';
+  import { getThread, openThread as openThreadAPI, subscribeToThread } from '../../lib/api/threads.js';
+  import { getPosts, createPost } from '../../lib/api/posts.js';
+  import { getParticipants, joinThread as joinThreadAPI, fixParticipantTurnOrders } from '../../lib/api/participants.js';
   import UserWarningBanner from '../../components/collaborative/UserWarningBanner.svelte';
   import BlockedUserBanner from '../../components/collaborative/BlockedUserBanner.svelte';
   import ThreadHeader from '../../components/collaborative/ThreadHeader.svelte';
@@ -79,39 +81,20 @@
 
     try {
       // Load thread
-      const { data: threadData, error: threadError } = await supabase
-        .from('writing_threads')
-        .select('*')
-        .eq('id', threadId)
-        .single();
-
-      if (threadError) throw threadError;
+      const { data: threadData, error: threadError } = await getThread(threadId);
+      if (threadError) throw new Error(threadError.message);
       thread = threadData;
 
       // Load participants
-      const { data: participantsData, error: participantsError } = await supabase
-        .from('thread_participants')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('joined_at', { ascending: true });
-
-      if (participantsError) throw participantsError;
+      const { data: participantsData, error: participantsError } = await getParticipants(threadId);
+      if (participantsError) throw new Error(participantsError.message);
       participants = participantsData || [];
 
       // If thread is active but participants don't have turn_order set, fix it
       if (thread.status === THREAD_STATUS.ACTIVE && participants.length > 0) {
-        const participantsWithoutTurnOrder = participants.filter(p => p.turn_order === null || p.turn_order === undefined);
-        if (participantsWithoutTurnOrder.length > 0) {
-          // Assign turn orders based on join order
-          for (let i = 0; i < participants.length; i++) {
-            if (participants[i].turn_order === null || participants[i].turn_order === undefined) {
-              await supabase
-                .from('thread_participants')
-                .update({ turn_order: i })
-                .eq('id', participants[i].id);
-              participants[i].turn_order = i;
-            }
-          }
+        const { data: fixedParticipants } = await fixParticipantTurnOrders(threadId, participants);
+        if (fixedParticipants) {
+          participants = fixedParticipants;
         }
       }
 
@@ -127,7 +110,6 @@
         currentUserParticipant = participants.find(p => p.user_id === $user.id);
         isParticipant = !!currentUserParticipant;
         isBlocked = await isUserBlocked($user.id);
-        
       }
 
       // Load posts
@@ -150,14 +132,9 @@
 
   async function loadPosts() {
     try {
-      const { data: postsData, error: postsError } = await supabase
-        .from('thread_posts')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('post_order', { ascending: true });
-
-      if (postsError) throw postsError;
-      posts = (postsData || []).filter(p => !p.is_removed);
+      const { data: postsData, error: postsError } = await getPosts(threadId);
+      if (postsError) throw new Error(postsError.message);
+      posts = postsData || [];
 
       // Load display names for post authors
       if (posts.length > 0) {
@@ -172,36 +149,26 @@
 
   async function openThread() {
     try {
-      // Assign turn orders to participants
-      const updates = participants.map((p, index) => ({
-        id: p.id,
-        turn_order: index
-      }));
-
-      for (const update of updates) {
-        await supabase
-          .from('thread_participants')
-          .update({ turn_order: update.turn_order })
-          .eq('id', update.id);
+      // Fix turn orders first
+      const { data: fixedParticipants } = await fixParticipantTurnOrders(threadId, participants);
+      if (fixedParticipants) {
+        participants = fixedParticipants;
       }
 
       // Update thread status
-      await supabase
-        .from('writing_threads')
-        .update({
-          status: 'active',
-          opened_at: new Date().toISOString()
-        })
-        .eq('id', threadId);
+      const { data: updatedThread, error: updateError } = await openThreadAPI(threadId);
+      if (updateError) throw new Error(updateError.message);
 
-      thread.status = 'active';
-      thread.opened_at = new Date().toISOString();
+      if (updatedThread) {
+        thread.status = updatedThread.status;
+        thread.opened_at = updatedThread.opened_at;
+      }
     } catch (err) {
       console.error('Error opening thread:', err);
     }
   }
 
-  async function joinThread() {
+  async function joinThreadHandler() {
     if (!$user || isBlocked) return;
 
     // Check if thread is full
@@ -211,44 +178,20 @@
     }
 
     // Check if thread is already active and at max
-    if (thread && thread.status === 'active' && participants.length >= thread.max_participants) {
+    if (thread && thread.status === THREAD_STATUS.ACTIVE && participants.length >= thread.max_participants) {
       error = 'Cannot join an active thread that is full';
       return;
     }
 
     try {
-      const { error: joinError, data: participantData } = await supabase
-        .from('thread_participants')
-        .insert({
-          thread_id: threadId,
-          user_id: $user.id
-        })
-        .select()
-        .single();
+      const { data: participantData, error: joinError } = await joinThreadAPI(threadId, $user.id);
 
       if (joinError) {
-        // Check if it's a duplicate key error (already a participant)
-        if (joinError.code === '23505' || joinError.message.includes('duplicate')) {
-          error = 'You are already a participant in this thread';
-        } else {
-          throw joinError;
-        }
+        error = joinError.message || 'Failed to join thread';
         return;
       }
 
-      // If thread is active, assign turn order to new participant
-      if (thread && thread.status === THREAD_STATUS.ACTIVE && participantData) {
-        // Get the highest turn order and add 1
-        const maxTurnOrder = participants.length > 0 
-          ? Math.max(...participants.map(p => p.turn_order ?? -1))
-          : -1;
-        
-        await supabase
-          .from('thread_participants')
-          .update({ turn_order: maxTurnOrder + 1 })
-          .eq('id', participantData.id);
-      }
-
+      // Reload thread to get updated participant list
       await loadThread();
     } catch (err) {
       error = err.message || 'Failed to join thread';
@@ -280,18 +223,16 @@
         .map(source => sanitizeSource(source))
         .filter(s => s.title || s.url || s.citation);
 
-      const { error: postError } = await supabase
-        .from('thread_posts')
-        .insert({
-          thread_id: threadId,
-          user_id: $user.id,
-          content: sanitizedContent,
-          sources: sanitizedSources,
-          plagiarism_confirmed: postData.plagiarism_confirmed,
-          post_order: nextPostOrder
-        });
+      const { error: postError } = await createPost({
+        thread_id: threadId,
+        user_id: $user.id,
+        content: sanitizedContent,
+        sources: sanitizedSources,
+        plagiarism_confirmed: postData.plagiarism_confirmed,
+        post_order: nextPostOrder
+      });
 
-      if (postError) throw postError;
+      if (postError) throw new Error(postError.message);
 
       // Reload thread and posts to get updated state
       await loadPosts();
@@ -310,28 +251,18 @@
       loadThread();
 
       // Subscribe to real-time updates
-      subscription = supabase
-        .channel(`thread_${threadId}`)
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'thread_posts', filter: `thread_id=eq.${threadId}` },
-          () => {
-            loadPosts();
-            checkIfCanPost();
-          }
-        )
-        .on('postgres_changes',
-          { event: '*', schema: 'public', table: 'thread_participants', filter: `thread_id=eq.${threadId}` },
-          () => {
-            loadThread();
-          }
-        )
-        .on('postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'writing_threads', filter: `id=eq.${threadId}` },
-          () => {
-            loadThread();
-          }
-        )
-        .subscribe();
+      subscription = subscribeToThread(threadId, {
+        onPostChange: () => {
+          loadPosts();
+          checkIfCanPost();
+        },
+        onParticipantChange: () => {
+          loadThread();
+        },
+        onThreadUpdate: () => {
+          loadThread();
+        }
+      });
     }
   });
 
@@ -373,7 +304,7 @@
       {isBlocked}
       {participants}
       {threadId}
-      onJoin={joinThread}
+      onJoin={joinThreadHandler}
       onPostSubmit={handlePostSubmit}
       isAuthenticated={!!$user}
     />

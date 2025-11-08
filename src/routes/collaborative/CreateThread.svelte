@@ -2,8 +2,9 @@
   import { onMount } from 'svelte';
   import { user } from '../../stores/auth.js';
   import { link } from 'svelte-spa-router';
-  import { supabase } from '../../lib/supabase/client.js';
   import { isUserBlocked } from '../../lib/moderation/blocks.js';
+  import { createThread } from '../../lib/api/threads.js';
+  import { joinThread } from '../../lib/api/participants.js';
   import { 
     MAX_THEME_LENGTH, 
     MIN_PARTICIPANTS, 
@@ -82,33 +83,24 @@
         throw new Error('User session expired. Please log in again.');
       }
 
-      const { data, error: createError } = await supabase
-        .from('writing_threads')
-        .insert({
-          theme: sanitizedTheme,
-          min_participants: minParticipants,
-          max_participants: maxParticipants,
-          created_by: $user.id,
-          status: 'waiting'
-        })
-        .select()
-        .single();
+      // Create the thread
+      const { data, error: createError } = await createThread({
+        theme: sanitizedTheme,
+        min_participants: minParticipants,
+        max_participants: maxParticipants,
+        created_by: $user.id
+      });
 
-      if (createError) throw createError;
+      if (createError) throw new Error(createError.message);
 
       if (!data || !data.id) {
         throw new Error('Failed to create thread - no data returned');
       }
 
       // Join the thread as the creator
-      const { error: joinError } = await supabase
-        .from('thread_participants')
-        .insert({
-          thread_id: data.id,
-          user_id: $user.id
-        });
+      const { error: joinError } = await joinThread(data.id, $user.id);
 
-      if (joinError) throw joinError;
+      if (joinError) throw new Error(joinError.message);
 
       // Redirect to the thread
       window.location.hash = `/collaborative/thread/${data.id}`;

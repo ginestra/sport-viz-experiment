@@ -1,10 +1,11 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { user, auth, loading as authLoading } from '../../stores/auth.js';
   import { link } from 'svelte-spa-router';
   import { supabase } from '../../lib/supabase/client.js';
   import { isModeratorOrAdmin } from '../../lib/moderation/roles.js';
   import { ensureProfile } from '../../lib/api/profiles.js';
+  import { getThreads, subscribeToThreads } from '../../lib/api/threads.js';
   import UserWarningBanner from '../../components/collaborative/UserWarningBanner.svelte';
   import BlockedUserBanner from '../../components/collaborative/BlockedUserBanner.svelte';
   import { isUserBlocked } from '../../lib/moderation/blocks.js';
@@ -15,43 +16,22 @@
   let threads = [];
   let loading = true;
   let error = '';
+  let unsubscribeThreads = null;
 
   async function loadThreads() {
     loading = true;
     error = '';
 
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('writing_threads')
-        .select(`
-          *,
-          thread_participants(count)
-        `)
-        .order('created_at', { ascending: false });
+    const { data, error: fetchError } = await getThreads();
 
-      if (fetchError) {
-        // Check if it's a table not found error
-        if (fetchError.message && fetchError.message.includes('schema cache')) {
-          error = 'Database not set up yet. Please run the SQL schema from SUPABASE_SCHEMA.md in your Supabase SQL Editor.';
-        } else {
-          throw fetchError;
-        }
-        threads = [];
-      } else {
-        threads = data || [];
-      }
-    } catch (err) {
-      // Handle table not found or other database errors gracefully
-      if (err.message && err.message.includes('schema cache')) {
-        error = 'Database not set up yet. Please run the SQL schema from SUPABASE_SCHEMA.md in your Supabase SQL Editor.';
-      } else {
-        error = err.message || 'Failed to load threads';
-      }
-      console.error('Error loading threads:', err);
+    if (fetchError) {
+      error = fetchError.message || 'Failed to load threads';
       threads = [];
-    } finally {
-      loading = false;
+    } else {
+      threads = data || [];
     }
+
+    loading = false;
   }
 
   async function handleSignOut() {
@@ -99,19 +79,15 @@
     loadThreads();
 
     // Subscribe to real-time updates
-    const subscription = supabase
-      .channel('threads_changes')
-      .on('postgres_changes', 
-        { event: '*', schema: 'public', table: 'writing_threads' },
-        () => {
-          loadThreads();
-        }
-      )
-      .subscribe();
+    unsubscribeThreads = subscribeToThreads(() => {
+      loadThreads();
+    });
+  });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+  onDestroy(() => {
+    if (unsubscribeThreads) {
+      unsubscribeThreads();
+    }
   });
 </script>
 
