@@ -4,13 +4,20 @@
   import { link } from 'svelte-spa-router';
   import { supabase } from '../../lib/supabase/client.js';
   import { isUserBlocked } from '../../lib/moderation/blocks.js';
+  import { 
+    MAX_THEME_LENGTH, 
+    MIN_PARTICIPANTS, 
+    MAX_PARTICIPANTS,
+    DEFAULT_MIN_PARTICIPANTS,
+    DEFAULT_MAX_PARTICIPANTS
+  } from '../../lib/constants/collaborative.js';
   import BlockedUserBanner from '../../components/collaborative/BlockedUserBanner.svelte';
 
   let isBlocked = false;
 
   let theme = '';
-  let minParticipants = 2;
-  let maxParticipants = 5;
+  let minParticipants = DEFAULT_MIN_PARTICIPANTS;
+  let maxParticipants = DEFAULT_MAX_PARTICIPANTS;
   let loading = false;
   let error = '';
 
@@ -40,19 +47,19 @@
       return;
     }
 
-    if (sanitizedTheme.length > 200) {
-      error = 'Theme must be 200 characters or less';
+    if (sanitizedTheme.length > MAX_THEME_LENGTH) {
+      error = `Theme must be ${MAX_THEME_LENGTH} characters or less`;
       return;
     }
 
     // Validate participant counts
-    if (minParticipants < 2) {
-      error = 'Minimum participants must be at least 2';
+    if (minParticipants < MIN_PARTICIPANTS) {
+      error = `Minimum participants must be at least ${MIN_PARTICIPANTS}`;
       return;
     }
 
-    if (minParticipants > 50) {
-      error = 'Minimum participants cannot exceed 50';
+    if (minParticipants > MAX_PARTICIPANTS) {
+      error = `Minimum participants cannot exceed ${MAX_PARTICIPANTS}`;
       return;
     }
 
@@ -61,8 +68,8 @@
       return;
     }
 
-    if (maxParticipants > 50) {
-      error = 'Maximum participants cannot exceed 50';
+    if (maxParticipants > MAX_PARTICIPANTS) {
+      error = `Maximum participants cannot exceed ${MAX_PARTICIPANTS}`;
       return;
     }
 
@@ -142,7 +149,7 @@
         placeholder="e.g., Climate Change Solutions"
         required
         disabled={loading}
-        maxlength="200"
+          maxlength="{MAX_THEME_LENGTH}"
       />
       <small class="help-text">The topic or theme for this collaborative writing thread</small>
     </div>
@@ -154,8 +161,8 @@
           id="minParticipants"
           type="number"
           bind:value={minParticipants}
-          min="2"
-          max="20"
+          min="{MIN_PARTICIPANTS}"
+          max="{MAX_PARTICIPANTS}"
           required
           disabled={loading}
         />
@@ -169,7 +176,7 @@
           type="number"
           bind:value={maxParticipants}
           min={minParticipants}
-          max="20"
+          max="{MAX_PARTICIPANTS}"
           required
           disabled={loading}
         />

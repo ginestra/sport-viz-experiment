@@ -1,5 +1,7 @@
 <script>
   import { user } from '../../stores/auth.js';
+  import { getWordCount } from '../../lib/utils/sanitize.js';
+  import { MAX_WORDS, MAX_CONTENT_LENGTH } from '../../lib/constants/collaborative.js';
   import SourceInput from './SourceInput.svelte';
 
   export let threadId = '';
@@ -11,9 +13,8 @@
   let plagiarismConfirmed = false;
   let error = '';
   let wordCount = 0;
-  const MAX_WORDS = 500;
 
-  $: wordCount = content.trim().split(/\s+/).filter(word => word.length > 0).length;
+  $: wordCount = getWordCount(content);
   $: isOverLimit = wordCount > MAX_WORDS;
   $: canSubmit = !disabled && content.trim().length > 0 && wordCount <= MAX_WORDS && plagiarismConfirmed && !isOverLimit;
 
@@ -70,10 +71,10 @@
       <textarea
         id="content"
         bind:value={content}
-        placeholder="Write your post here (maximum 500 words)..."
+        placeholder="Write your post here (maximum {MAX_WORDS} words)..."
         rows="10"
         disabled={disabled}
-        maxlength="5000"
+        maxlength="{MAX_CONTENT_LENGTH}"
       ></textarea>
       {#if isOverLimit}
         <small class="error-text">You have exceeded the {MAX_WORDS} word limit. Please shorten your post.</small>

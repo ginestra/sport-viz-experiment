@@ -4,6 +4,9 @@
   import { link } from 'svelte-spa-router';
   import { supabase } from '../../lib/supabase/client.js';
   import { isUserBlocked } from '../../lib/moderation/blocks.js';
+  import { getWordCount, sanitizeSource } from '../../lib/utils/sanitize.js';
+  import { generateContributorColor } from '../../lib/utils/colors.js';
+  import { MAX_WORDS } from '../../lib/constants/collaborative.js';
   import PostForm from '../../components/collaborative/PostForm.svelte';
   import FlagPostButton from '../../components/collaborative/FlagPostButton.svelte';
   import UserWarningBanner from '../../components/collaborative/UserWarningBanner.svelte';
@@ -39,16 +42,7 @@
   
   function getContributorColor(userId) {
     if (!contributorColors[userId]) {
-      // Generate a consistent color based on user_id hash
-      let hash = 0;
-      for (let i = 0; i < userId.length; i++) {
-        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
-      }
-      // Generate a color with good contrast (avoid too light colors)
-      const hue = Math.abs(hash) % 360;
-      const saturation = 60 + (Math.abs(hash) % 20); // 60-80%
-      const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
-      contributorColors[userId] = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+      contributorColors[userId] = generateContributorColor(userId);
     }
     return contributorColors[userId];
   }
@@ -322,8 +316,8 @@
     try {
       // Validate content length
       const wordCount = getWordCount(postData.content);
-      if (wordCount > 500) {
-        error = 'Post exceeds 500 word limit';
+      if (wordCount > MAX_WORDS) {
+        error = `Post exceeds ${MAX_WORDS} word limit`;
         return;
       }
 
@@ -336,11 +330,9 @@
       const sanitizedContent = postData.content.trim();
       
       // Sanitize sources
-      const sanitizedSources = (postData.sources || []).map(source => ({
-        title: (source.title || '').trim(),
-        url: (source.url || '').trim(),
-        citation: (source.citation || '').trim()
-      })).filter(s => s.title || s.url || s.citation);
+      const sanitizedSources = (postData.sources || [])
+        .map(source => sanitizeSource(source))
+        .filter(s => s.title || s.url || s.citation);
 
       const { error: postError } = await supabase
         .from('thread_posts')
@@ -366,9 +358,6 @@
     }
   }
 
-  function getWordCount(text) {
-    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
-  }
 
   onMount(() => {
     if (threadId) {
