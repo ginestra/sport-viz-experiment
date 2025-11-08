@@ -101,9 +101,18 @@ This project is configured for deployment on Vercel.
 1. Push your code to GitHub
 2. Import your repository at [vercel.com](https://vercel.com)
 3. Vercel will automatically detect the Vite configuration from `vercel.json`
-4. Deploy with one click
+4. **Set environment variables** (required for collaborative writing feature):
+   - Go to **Settings** → **Environment Variables**
+   - Add `VITE_SUPABASE_URL` (your Supabase project URL)
+   - Add `VITE_SUPABASE_ANON_KEY` (your Supabase anon/public key)
+   - Add `SUPABASE_SERVICE_ROLE_KEY` (your Supabase service role key - server-side only)
+   - Enable for **Production**, **Preview**, and **Development** environments
+5. **Redeploy** after setting variables
+6. Deploy with one click
 
 Future pushes to the `main` branch will automatically trigger deployments.
+
+**📖 See `VERCEL_DEPLOYMENT.md` for detailed deployment instructions.**
 
 ## Project Structure
 
