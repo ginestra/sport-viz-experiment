@@ -32,6 +32,36 @@
   let canPost = false;
   let nextPostOrder = 0;
   let subscription = null;
+  let viewMode = 'write'; // 'write' or 'read'
+  
+  // Generate color for each contributor based on their user_id
+  let contributorColors = {};
+  
+  function getContributorColor(userId) {
+    if (!contributorColors[userId]) {
+      // Generate a consistent color based on user_id hash
+      let hash = 0;
+      for (let i = 0; i < userId.length; i++) {
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      // Generate a color with good contrast (avoid too light colors)
+      const hue = Math.abs(hash) % 360;
+      const saturation = 60 + (Math.abs(hash) % 20); // 60-80%
+      const lightness = 45 + (Math.abs(hash) % 15); // 45-60%
+      contributorColors[userId] = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+    }
+    return contributorColors[userId];
+  }
+  
+  function getContributorName(userId) {
+    if (userId === $user?.id) return 'You';
+    return postAuthorProfiles[userId] || `User ${userId.substring(0, 8)}...`;
+  }
+  
+  // Split post content into paragraphs for read view
+  function splitIntoParagraphs(text) {
+    return text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+  }
 
   // Get current user's turn order and check if it's their turn
   function checkIfCanPost() {
@@ -458,26 +488,55 @@
     {/if}
 
     <div class="posts-section">
-      <h2>Posts ({posts.length})</h2>
+      <div class="posts-header">
+        <h2>Posts ({posts.length})</h2>
+        {#if posts.length > 0}
+          <div class="view-toggle">
+            <button 
+              class="toggle-button {viewMode === 'write' ? 'active' : ''}"
+              on:click={() => viewMode = 'write'}
+            >
+              Write Mode
+            </button>
+            <button 
+              class="toggle-button {viewMode === 'read' ? 'active' : ''}"
+              on:click={() => viewMode = 'read'}
+            >
+              Read Mode
+            </button>
+          </div>
+        {/if}
+      </div>
+      
       {#if posts.length === 0}
         <div class="empty-posts">No posts yet. Be the first to write!</div>
-      {:else}
-        <div class="posts-list">
+      {:else if viewMode === 'write'}
+        <div class="posts-list write-view">
           {#each posts as post}
-            <div class="post-item">
+            <div 
+              class="post-item"
+              style="border-left: 4px solid {getContributorColor(post.user_id)}"
+            >
               <div class="post-header">
                 <span class="post-order">Post #{post.post_order + 1}</span>
                 <span class="post-author">
-                  {post.user_id === $user?.id 
-                    ? 'You' 
-                    : (postAuthorProfiles[post.user_id] || `User ${post.user_id.substring(0, 8)}...`)}
+                  {getContributorName(post.user_id)}
                 </span>
                 <span class="post-date">{new Date(post.created_at).toLocaleString()}</span>
                 {#if $user && post.user_id !== $user?.id}
                   <FlagPostButton postId={post.id} />
                 {/if}
               </div>
-              <div class="post-content">{post.content}</div>
+              <div class="post-content">
+                {#each splitIntoParagraphs(post.content) as paragraph}
+                  <p 
+                    class="content-paragraph"
+                    style="border-left: 3px solid {getContributorColor(post.user_id)}"
+                  >
+                    {paragraph.trim()}
+                  </p>
+                {/each}
+              </div>
               {#if post.sources && post.sources.length > 0}
                 <div class="post-sources">
                   <strong>Sources:</strong>
@@ -502,6 +561,36 @@
               {/if}
             </div>
           {/each}
+        </div>
+      {:else}
+        <div class="posts-list read-view">
+          <div class="read-view-content">
+            {#each posts as post}
+              {#each splitIntoParagraphs(post.content) as paragraph}
+                <p 
+                  class="read-paragraph"
+                  style="border-left: 4px solid {getContributorColor(post.user_id)}"
+                  title="{getContributorName(post.user_id)}"
+                >
+                  {paragraph.trim()}
+                </p>
+              {/each}
+            {/each}
+          </div>
+          <div class="read-view-metadata">
+            <h3>Contributors</h3>
+            <div class="contributors-list">
+              {#each [...new Set(posts.map(p => p.user_id))] as userId}
+                <div class="contributor-item">
+                  <span 
+                    class="contributor-color"
+                    style="background-color: {getContributorColor(userId)}"
+                  ></span>
+                  <span class="contributor-name">{getContributorName(userId)}</span>
+                </div>
+              {/each}
+            </div>
+          </div>
         </div>
       {/if}
     </div>
@@ -631,9 +720,48 @@
     margin-top: 3rem;
   }
 
+  .posts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
   .posts-section h2 {
-    margin: 0 0 1.5rem 0;
+    margin: 0;
     color: var(--text-color);
+  }
+
+  .view-toggle {
+    display: flex;
+    gap: 0.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.25rem;
+  }
+
+  .toggle-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+  }
+
+  .toggle-button:hover {
+    background: var(--bg-primary);
+    color: var(--text-color);
+  }
+
+  .toggle-button.active {
+    background: var(--primary-color);
+    color: white;
   }
 
   .empty-posts {
@@ -682,8 +810,118 @@
   .post-content {
     color: var(--text-color);
     line-height: 1.8;
-    white-space: pre-wrap;
     margin-bottom: 1rem;
+  }
+
+  .content-paragraph {
+    padding-left: 1rem;
+    margin: 0.75rem 0;
+    line-height: 1.8;
+    white-space: pre-wrap;
+  }
+
+  .content-paragraph:first-child {
+    margin-top: 0;
+  }
+
+  .content-paragraph:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Read View Styles */
+  .read-view {
+    display: flex;
+    gap: 2rem;
+    flex-direction: column;
+  }
+
+  @media (min-width: 768px) {
+    .read-view {
+      flex-direction: row;
+    }
+  }
+
+  .read-view-content {
+    flex: 1;
+    max-width: 100%;
+  }
+
+  @media (min-width: 768px) {
+    .read-view-content {
+      max-width: 70%;
+    }
+  }
+
+  .read-paragraph {
+    padding: 1rem 1.5rem;
+    padding-left: 2rem;
+    margin: 1rem 0;
+    line-height: 2;
+    color: var(--text-color);
+    background: var(--bg-secondary);
+    border-radius: 4px;
+    white-space: pre-wrap;
+    transition: all 0.2s ease;
+  }
+
+  .read-paragraph:hover {
+    background: var(--bg-primary);
+    transform: translateX(4px);
+  }
+
+  .read-paragraph:first-child {
+    margin-top: 0;
+  }
+
+  .read-paragraph:last-child {
+    margin-bottom: 0;
+  }
+
+  .read-view-metadata {
+    padding: 1.5rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    height: fit-content;
+  }
+
+  @media (min-width: 768px) {
+    .read-view-metadata {
+      width: 25%;
+      position: sticky;
+      top: 2rem;
+    }
+  }
+
+  .read-view-metadata h3 {
+    margin: 0 0 1rem 0;
+    color: var(--text-color);
+    font-size: 1.1rem;
+  }
+
+  .contributors-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .contributor-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .contributor-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 2px solid var(--border-color);
+  }
+
+  .contributor-name {
+    color: var(--text-color);
+    font-size: 0.9rem;
   }
 
   .post-sources {
